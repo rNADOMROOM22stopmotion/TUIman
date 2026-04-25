@@ -1,15 +1,16 @@
 AlbumList{
+    border: dashed round cornflowerblue;
     width: 30%;
     dock: left;
 }
 
 SongList{
+    border: dashed round cornflowerblue;
     width: 70%;
     dock: right;
 }
 
 TopBox {
-    border: dashed round green;
     margin-top: 1;
     margin-right: 1;
     margin-left: 1;
@@ -17,7 +18,7 @@ TopBox {
 }
 
 BottomBox {
-    border: dashed round green;
+    border: dashed round darkorange;
     height: 5;
     dock: bottom;         /* sticks to bottom of screen, right under TopBox */
     margin-bottom: 1;
@@ -27,10 +28,11 @@ BottomBox {
 }
 
 PlayControls {
-    border-right: round red;
+    border-right: yellowgreen;
     width: 30%;
     dock: left;
     layout: horizontal;
+    align-horizontal: center;
 }
 
 Playback {
@@ -40,8 +42,8 @@ Playback {
 
 Button {
     border: round grey;
-    min-width: 6;
-    width: 6;
+    min-width: 10;
+    width: 7;
     height: 3;
 }
 
