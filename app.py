@@ -1,11 +1,15 @@
 import os
-from textual.app import App, ComposeResult
+
+from rich_pixels import Pixels
+from textual.app import App, ComposeResult, RenderResult
 from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Header, Footer, Input, OptionList, Button, ProgressBar, Label
 from utils.search import search_function, load_library
+from utils.player import init_player, play_song, pause, resume
 
+init_player()
 
 class AlbumList(VerticalScroll):
     """Lists user albums"""
@@ -21,6 +25,16 @@ class AlbumList(VerticalScroll):
 
     def on_input_changed(self, event: Input.Changed) -> None:
         search_function(self, event, self.albums)
+
+
+class AlbumCover(Widget):
+    """using rich renderable to render ascii album cover"""
+
+    def render(self) -> RenderResult:
+        """load album art and display album cover"""
+        album_cover = Pixels.from_image_path("./data/album2/img.png", resize=(15, 15))
+        return album_cover
+
 
 class SongList(VerticalScroll):
     """Lists album songs"""
@@ -61,8 +75,15 @@ class PlayControls(Widget):
         yield Button("⏭", variant="primary", flat=True)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """handles button state and pauses/ plays music"""
         if event.button.id == "pause":
-            event.button.label = "▶" if event.button.label == "||" else "||"
+            if event.button.label == "||":
+                event.button.label = "▶"
+                pause()
+            else:
+                event.button.label = "||"
+                resume()
+
 
 class Playback(Widget):
     """Displays playing bar"""
@@ -81,6 +102,7 @@ class TopBox(Widget):
     def compose(self) -> ComposeResult:
         yield AlbumList(self.albums)
         yield SongList(self.data_dict)
+        yield AlbumCover()
 
     def on_mount(self) -> None:
         self.query_one(SongList).border_title = "Songs"
@@ -96,6 +118,7 @@ class TopBox(Widget):
 
         if event.control in self.query_one(SongList).query(OptionList):
             song_name = str(event.option.prompt)
+            play_song(self.data_dict, song_name)
             # add song playing logic here
 
 class BottomBox(Widget):

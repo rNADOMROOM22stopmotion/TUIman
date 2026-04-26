@@ -8,6 +8,7 @@ SongList{
     border: dashed round cornflowerblue;
     width: 70%;
     dock: right;
+    layer: below;
 }
 
 TopBox {
@@ -15,6 +16,8 @@ TopBox {
     margin-right: 1;
     margin-left: 1;
     height: 1fr;          /* take up remaining space */
+    layers: below above;
+    align: right bottom;
 }
 
 BottomBox {
@@ -49,4 +52,11 @@ Button {
 
 #song-name {
     margin-bottom: 1;
+}
+
+AlbumCover {
+    layer: above;
+    width: 17;
+    height: 10;
+    border: round gainsboro;
 }
