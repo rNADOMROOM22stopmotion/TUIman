@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.14"
 dependencies = [
+    "mutagen>=1.47.0",
     "pygame-ce>=2.5.7",
     "rich-pixels>=3.0.1",
     "textual>=8.2.4",

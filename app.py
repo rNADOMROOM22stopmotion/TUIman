@@ -1,22 +1,25 @@
 import os
-
+import textwrap
 from rich_pixels import Pixels
 from textual.app import App, ComposeResult, RenderResult
+from textual.color import Gradient
 from textual.containers import VerticalScroll
 from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widget import Widget
-from textual.widgets import Header, Footer, Input, OptionList, Button, ProgressBar, Label
+from textual.widgets import Header, Footer, Input, OptionList, Button, ProgressBar, Label, Markdown
 from utils.search import search_function, load_library
-from utils.player import init_player, play_song, pause, resume
+from utils.player import init_player, play_song, pause, resume, get_progress
 
 init_player()
 
 class AlbumList(VerticalScroll):
     """Lists user albums"""
-    def __init__(self, albums: list[str]) -> None:
+
+    def __init__(self, data: dict) -> None:
         super().__init__()
-        self.albums = albums
+        self.data = data
+        self.albums = [*data.keys()]
 
     def compose(self) -> ComposeResult:
         yield Input(placeholder="Search album name", type="text")
@@ -24,14 +27,16 @@ class AlbumList(VerticalScroll):
             *self.albums
         )
 
+    def on_mount(self) -> None:
+        self.border_title = "Albums"
+
     def on_input_changed(self, event: Input.Changed) -> None:
         search_function(self, event, self.albums)
 
 
 class AlbumCover(Widget):
     """using rich renderable to render ascii album cover"""
-
-    path: reactive[str] = reactive("./data/album2/img.png")
+    path: reactive[str] = reactive("./media/unknown.png") #default album art
     def render(self) -> RenderResult:
         """load album art and display album cover"""
         album_cover = Pixels.from_image_path(self.path, resize=(20, 15))
@@ -40,6 +45,7 @@ class AlbumCover(Widget):
 
 class SongList(VerticalScroll):
     """Lists album songs"""
+
     def __init__(self, song_data: dict) -> None:
         super().__init__()
         self.song_data = song_data
@@ -49,6 +55,9 @@ class SongList(VerticalScroll):
         yield Input(placeholder="Search song name", type="text")
         yield OptionList(
         )
+
+    def on_mount(self) -> None:
+        self.border_title = "Songs"
 
     def on_input_changed(self, event: Input.Changed) -> None:
         all_songs = self.current_songs
@@ -90,8 +99,41 @@ class PlayControls(Widget):
 class Playback(Widget):
     """Displays playing bar"""
     def compose(self) -> ComposeResult:
+        gradient = Gradient.from_colors("#881177","#aa3355","#cc6666","#ee9944","#eedd00","#99dd55","#44dd88","#22ccbb","#00bbcc","#0099cc","#3366bb","#663399",)
+
         yield Label("Playing: ", id="song-name")
-        yield ProgressBar()
+        yield ProgressBar(total=100, show_eta=False, gradient=gradient)
+
+    def on_mount(self) -> None:
+        """Progress bar"""
+        self.set_interval(1 / 30, self.make_progress)
+
+    def make_progress(self) -> None:
+        """Called automatically to advance the progress bar."""
+        progress = 0
+        time_stamps = get_progress()
+        if not time_stamps[2]:
+            try:
+                progress = int((time_stamps[0]/time_stamps[1]) * 100)
+            except ZeroDivisionError:
+                progress = 0
+        self.query_one(ProgressBar).update(progress=progress)
+
+class RightPane(Widget):
+    pass
+class LyricBox(Widget):
+    """Display song lyrics"""
+
+    EXAMPLE_LYRIC = textwrap.dedent("""\
+If they say why? (Why?) Why? (Why?)  
+***• Tell 'em that it's human nature***  
+Why? (Why?) Why? (Why?) Does he do me that way?
+""")
+    def compose(self) -> ComposeResult:
+        yield Markdown(self.EXAMPLE_LYRIC)
+
+    def on_mount(self) -> None:
+        self.border_title = "Lyrics"
 
 
 class TopBox(Widget):
@@ -99,16 +141,13 @@ class TopBox(Widget):
     def __init__(self, path: str) -> None:
         super().__init__()
         self.data_dict = load_library(path)
-        self.albums = [*self.data_dict.keys()]
 
     def compose(self) -> ComposeResult:
-        yield AlbumList(self.albums)
-        yield SongList(self.data_dict)
+        yield AlbumList(self.data_dict)
+        with RightPane():
+            yield SongList(self.data_dict)
+            yield LyricBox()
         yield AlbumCover()
-
-    def on_mount(self) -> None:
-        self.query_one(SongList).border_title = "Songs"
-        self.query_one(AlbumList).border_title = "Albums"
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         # Make sure the event came from AlbumList, not SongList's OptionList
@@ -126,6 +165,11 @@ class TopBox(Widget):
             song_name = str(event.option.prompt)
             play_song(self.data_dict, song_name)
             # TODO: add song queue logic here
+
+    def on_mount(self)->None:
+        album_data = list(self.data_dict.values())
+        if album_data:
+            self.query_one(AlbumCover).path = album_data[0]['album_art']
 
 class BottomBox(Widget):
     """Class containing play controls and playback bar"""

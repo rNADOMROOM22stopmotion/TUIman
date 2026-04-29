@@ -1,9 +1,11 @@
 import pygame
 from typing import Optional
+import mutagen
 
 # module-level state
 _current_album: Optional[str] = None
 _current_song: Optional[str] = None
+_current_duration: float = 0.0
 _paused: bool = False
 
 def init_player() -> None:
@@ -15,7 +17,7 @@ def play_song(data_dict: dict, song_name: str) -> bool:
     Play a song by name, searching across all albums.
     Returns True on success, False if song not found.
     """
-    global _current_album, _current_song, _paused
+    global _current_album, _current_duration, _current_song, _paused
 
     for album_name, data in data_dict.items():
         if song_name in data['songs']:
@@ -26,6 +28,11 @@ def play_song(data_dict: dict, song_name: str) -> bool:
             _current_album = album_name
             _current_song = song_name
             _paused = False
+
+            # cache duration at load time
+            audio = mutagen.File(path)
+            _current_duration = audio.info.length if audio else 0.0
+
             return True
 
     return False
@@ -59,3 +66,14 @@ def get_current() -> dict:
         "paused": _paused,
         "playing": pygame.mixer.music.get_busy()
     }
+
+def get_progress() -> tuple[float, float, bool]:
+    """Returns (elapsed_seconds, total_seconds, track_ended)."""
+    if _current_song is None:
+        return (0.0, 0.0, False)
+
+    raw_pos = pygame.mixer.music.get_pos()
+    track_ended = raw_pos == -1 and not _paused and _current_song is not None
+    elapsed = max(0.0, raw_pos / 1000.0)
+
+    return (elapsed, _current_duration, track_ended)
