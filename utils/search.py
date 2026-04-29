@@ -1,4 +1,6 @@
 import os
+from pprint import pprint
+
 from textual.widgets import Input, OptionList
 
 
@@ -22,20 +24,34 @@ def load_library(root_dir: str) -> dict:
     for album in sorted(os.scandir(root_dir), key=lambda e: e.name):
         if not album.is_dir():
             continue
-        songs = {
-            os.path.splitext(song.name)[0]: song.path
-            for song in sorted(os.scandir(album.path), key=lambda e: e.name)
-            if song.is_file() and song.name.lower().endswith(".mp3")
-        }
+        songs = {}
+        album_art = ""
+
+        # Scan through all entries in the album directory, sorted by name
+        entries = sorted(os.scandir(album.path), key=lambda e: e.name)
+        for entry in entries:
+            if not entry.is_file():
+                continue
+            filename = entry.name.lower()
+            if filename.endswith(".jpg") or filename.endswith(".png"):
+                album_art = entry.path
+            if not filename.endswith(".mp3"):
+                continue
+            song_name = os.path.splitext(entry.name)[0]
+            # Store in dictionary: {song_name: full_path}
+            songs[song_name] = entry.path
         if songs:
-            library[album.name] = songs
+            library[album.name] = {
+                "songs": songs,
+                "album_art": album_art
+            }
     return library
 
 
 if "__main__" == __name__:
     library = load_library(r"F:\koding\PythonProject\data")
     print(*library.get("album2", []).keys())
-    print(library)
+    pprint(library)
     # print([*library.keys()])
     # for album in library:
     #     print(album)

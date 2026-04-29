@@ -3,6 +3,7 @@ import os
 from rich_pixels import Pixels
 from textual.app import App, ComposeResult, RenderResult
 from textual.containers import VerticalScroll
+from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Header, Footer, Input, OptionList, Button, ProgressBar, Label
@@ -30,9 +31,10 @@ class AlbumList(VerticalScroll):
 class AlbumCover(Widget):
     """using rich renderable to render ascii album cover"""
 
+    path: reactive[str] = reactive("./data/album2/img.png")
     def render(self) -> RenderResult:
         """load album art and display album cover"""
-        album_cover = Pixels.from_image_path("./data/album2/img.png", resize=(15, 15))
+        album_cover = Pixels.from_image_path(self.path, resize=(20, 15))
         return album_cover
 
 
@@ -53,13 +55,13 @@ class SongList(VerticalScroll):
 
         search_function(self, event, all_songs)
 
-    def load_album(self, album_name: str) -> None:
+    def update_song_list(self, album_name: str) -> None:
         """
         updates the SongList Ui
         :param album_name: passed by event handler
         """
-        songs = self.song_data.get(album_name, [])
-        # your logic here — e.g. clear and repopulate the OptionList
+        songs = self.song_data.get(album_name, {}).get("songs", [])
+        # clear and repopulate the OptionList
         option_list = self.query_one(OptionList)
         option_list.clear_options()
         self.current_songs = []
@@ -112,14 +114,18 @@ class TopBox(Widget):
         # Make sure the event came from AlbumList, not SongList's OptionList
         if event.control in self.query_one(AlbumList).query(OptionList):
             album_name = str(event.option.prompt)
+            # Update SongList UI
             song_list_obj = self.query_one(SongList)
-            song_list_obj.load_album(album_name)
+            song_list_obj.update_song_list(album_name)
             song_list_obj.query_one(Input).clear()
+            # Update Album Cover Display
+            self.query_one(AlbumCover).path = self.data_dict.get(album_name).get('album_art')
 
+        # If SongList option, selected, play song
         if event.control in self.query_one(SongList).query(OptionList):
             song_name = str(event.option.prompt)
             play_song(self.data_dict, song_name)
-            # add song playing logic here
+            # TODO: add song queue logic here
 
 class BottomBox(Widget):
     """Class containing play controls and playback bar"""
@@ -129,16 +135,17 @@ class BottomBox(Widget):
 
 class DirectoryDialog(ModalScreen[str]):
     def compose(self) -> ComposeResult:
-        yield Label("Enter albums folder path:")
-        yield Input(placeholder="/path/to/albums")
+        yield Label(" Enter albums folder path:")
+        yield Input(placeholder="/path/to/albums", id="modal_input")
         yield Button("Load", variant="primary")
+        #TODO: add textual-autocomplete
 
     def on_button_pressed(self) -> None:
         path = self.query_one(Input).value.strip()
         if os.path.isdir(path):
             self.dismiss(path)  # sends path back to the MusicApp
         else:
-            self.query_one(Label).update("❌ Invalid path, try again:")
+            self.query_one(Label).update(" ❌ Invalid path, try again:")
 
 
 class MusicApp(App):

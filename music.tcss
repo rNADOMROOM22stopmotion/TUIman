@@ -56,7 +56,15 @@ Button {
 
 AlbumCover {
     layer: above;
-    width: 17;
+    width: 22;
     height: 10;
     border: round gainsboro;
+}
+
+DirectoryDialog{
+    align: center middle;
+}
+
+#modal_input{
+    width: 35%;
 }

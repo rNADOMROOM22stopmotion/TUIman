@@ -17,9 +17,9 @@ def play_song(data_dict: dict, song_name: str) -> bool:
     """
     global _current_album, _current_song, _paused
 
-    for album_name, songs in data_dict.items():
-        if song_name in songs:
-            path = songs[song_name]
+    for album_name, data in data_dict.items():
+        if song_name in data['songs']:
+            path = data['songs'][song_name]
             pygame.mixer.music.stop()
             pygame.mixer.music.load(path)
             pygame.mixer.music.play()
