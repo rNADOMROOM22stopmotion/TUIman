@@ -1,5 +1,4 @@
 import os
-import textwrap
 from rich_pixels import Pixels
 from textual.app import App, ComposeResult, RenderResult
 from textual.color import Gradient
@@ -8,10 +7,15 @@ from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Header, Footer, Input, OptionList, Button, ProgressBar, Label, Markdown
+from utils.lyrics import extract_lyrics
 from utils.search import search_function, load_library
 from utils.player import init_player, play_song, pause, resume, get_progress
 
 init_player()
+
+def logger(text)->None:
+    with open("log.txt", "w") as f:
+        f.write(f"{text}\n")
 
 class AlbumList(VerticalScroll):
     """Lists user albums"""
@@ -124,17 +128,60 @@ class RightPane(Widget):
 class LyricBox(Widget):
     """Display song lyrics"""
 
-    EXAMPLE_LYRIC = textwrap.dedent("""\
-If they say why? (Why?) Why? (Why?)  
-***• Tell 'em that it's human nature***  
-Why? (Why?) Why? (Why?) Does he do me that way?
-""")
+    current_index: reactive[int] = reactive(-1)
+    current_song_path: reactive[str] = reactive("")
+    def __init__(self):
+        super().__init__()
+        self.parsed_lyrics = []
+
+    def watch_current_song_path(self, path: str) -> None:
+        """Re-parse lyrics whenever the song changes"""
+        self.current_index = -1  # reset index for new song
+        if path:
+            self.parsed_lyrics = extract_lyrics(path=path)['lyrics']
+        else:
+            self.parsed_lyrics = []
+
     def compose(self) -> ComposeResult:
-        yield Markdown(self.EXAMPLE_LYRIC)
+        yield Markdown("")
 
     def on_mount(self) -> None:
         self.border_title = "Lyrics"
+        # Poll every 1/30ms
+        self.set_interval(1/30, self.update_lyrics)
 
+    def update_lyrics(self) -> None:
+        if not self.parsed_lyrics:
+            return
+
+        now = get_progress()[0]  # how much the song has finished
+
+        # Find the latest lyric whose time <= now
+        idx = -1
+        for i, (t, _) in enumerate(self.parsed_lyrics):
+            if t <= now:
+                idx = i
+            else:
+                break
+
+        if idx != self.current_index:
+            self.current_index = idx
+
+    def watch_current_index(self, idx: int) -> None:
+        """Called automatically when current_index changes"""
+        if not self.parsed_lyrics or idx == -1:
+            self.query_one(Markdown).update("")
+            return
+
+        lyrics = self.parsed_lyrics
+
+        prev_text = f"*{lyrics[idx - 1][1]}*  " if idx > 0 else ""
+        curr_text = f"**{lyrics[idx][1]}**  "
+        next_text = f"*{lyrics[idx + 1][1]}*  " if idx < len(lyrics) - 1 else ""
+
+        content = "\n".join(filter(bool, [prev_text, curr_text, next_text]))
+        logger(content)
+        self.query_one(Markdown).update(content)
 
 class TopBox(Widget):
     """Class containing album and song list"""
@@ -165,6 +212,10 @@ class TopBox(Widget):
             song_name = str(event.option.prompt)
             play_song(self.data_dict, song_name)
             # TODO: add song queue logic here
+            # TODO: load song lyrics here
+            path = next((songs[song_name] for album in self.data_dict.values() for songs in [album['songs']] if song_name in songs), "bruhhh")
+            self.query_one(LyricBox).current_song_path = path
+            logger(path)
 
     def on_mount(self)->None:
         album_data = list(self.data_dict.values())
