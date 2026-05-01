@@ -1,6 +1,5 @@
 from pathlib import Path
 from pprint import pprint
-
 from textual.widgets import Input, OptionList
 
 SUPPORTED_AUDIO_EXTENSIONS = {".mp3"}
@@ -73,4 +72,4 @@ if "__main__" == __name__:
     # print([*library.keys()])
     # for album in library:
     #     print(album)
-    print(next((songs["Chic 'N' Stu_spotdown.org.mp3"] for album in library.values() for songs in [album['songs']] if "Chic 'N' Stu_spotdown.org.mp3" in songs), ""))
+    print(next((songs["Chic 'N' Stu.mp3"] for album in library.values() for songs in [album['songs']] if "Chic 'N' Stu.mp3" in songs), ""))
