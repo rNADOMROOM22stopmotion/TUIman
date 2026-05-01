@@ -4,7 +4,7 @@ import mutagen
 
 # module-level state
 _current_album: Optional[str] = None
-_current_song: Optional[str] = None
+_current_song: Optional[str] = "-----"
 _current_duration: float = 0.0
 _paused: bool = False
 

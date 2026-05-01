@@ -1,15 +1,17 @@
 import os
 from rich_pixels import Pixels
 from textual.app import App, ComposeResult, RenderResult
-from textual.color import Gradient
+from textual.color import Gradient, Color
 from textual.containers import VerticalScroll
+from textual.css.scalar import Scalar, Unit
 from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widget import Widget
-from textual.widgets import Header, Footer, Input, OptionList, Button, ProgressBar, Label, Markdown
+from textual.widgets import Header, Footer, Input, OptionList, Button, ProgressBar, Label, Markdown, RadioSet, \
+    RadioButton
 from utils.lyrics import extract_lyrics
 from utils.search import search_function, load_library
-from utils.player import init_player, play_song, pause, resume, get_progress
+from utils.player import init_player, play_song, pause, resume, get_progress, get_current
 
 init_player()
 
@@ -17,7 +19,7 @@ def logger(text)->None:
     with open("log.txt", "w") as f:
         f.write(f"{text}\n")
 
-class AlbumList(VerticalScroll):
+class AlbumList(Widget):
     """Lists user albums"""
 
     def __init__(self, data: dict) -> None:
@@ -47,7 +49,7 @@ class AlbumCover(Widget):
         return album_cover
 
 
-class SongList(VerticalScroll):
+class SongList(Widget):
     """Lists album songs"""
 
     def __init__(self, song_data: dict) -> None:
@@ -70,7 +72,7 @@ class SongList(VerticalScroll):
 
     def update_song_list(self, album_name: str) -> None:
         """
-        updates the SongList Ui
+        updates the SongList Ui when album is selected
         :param album_name: passed by event handler
         """
         songs = self.song_data.get(album_name, {}).get("songs", [])
@@ -89,28 +91,35 @@ class PlayControls(Widget):
         yield Button("||", id="pause", variant="success", flat=True)
         yield Button("⏭", variant="primary", flat=True)
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
+    @staticmethod
+    def on_button_pressed(event: Button.Pressed) -> None:
         """handles button state and pauses/ plays music"""
         if event.button.id == "pause":
             if event.button.label == "||":
                 event.button.label = "▶"
+                event.button.styles.border = ("round", "yellow")
+                event.button.styles.color = "deeppink"
                 pause()
             else:
                 event.button.label = "||"
+                event.button.styles.border = ("round", "deeppink")
+                event.button.styles.color = Color(255, 255, 255, 0.7)
                 resume()
 
 
 class Playback(Widget):
     """Displays playing bar"""
+    current_song = reactive("-----")
+
     def compose(self) -> ComposeResult:
         gradient = Gradient.from_colors("#881177","#aa3355","#cc6666","#ee9944","#eedd00","#99dd55","#44dd88","#22ccbb","#00bbcc","#0099cc","#3366bb","#663399",)
-
-        yield Label("Playing: ", id="song-name")
+        yield Label("Playing: -----", id="song-name")
         yield ProgressBar(total=100, show_eta=False, gradient=gradient)
 
     def on_mount(self) -> None:
         """Progress bar"""
         self.set_interval(1 / 30, self.make_progress)
+        self.set_interval(1/10 , self.sync_song)
 
     def make_progress(self) -> None:
         """Called automatically to advance the progress bar."""
@@ -122,6 +131,26 @@ class Playback(Widget):
             except ZeroDivisionError:
                 progress = 0
         self.query_one(ProgressBar).update(progress=progress)
+
+    def sync_song(self)->None:
+        c_song = get_current().get("song")
+        if c_song != self.current_song:
+            self.current_song = c_song
+
+    def watch_current_song(self, song):
+        self.query_one("#song-name", Label).update(f"Playing: {song}")
+
+class QueueOptions(Widget):
+    """show/ hide queue, shuffle options"""
+
+    def compose(self) -> ComposeResult:
+        yield Button("Queue", variant="primary", flat=True, classes="queue-btn", id="show-queue")
+        yield Button("Shuffle", variant="primary", flat=True, classes="queue-btn" ,id="shuffle-queue")
+
+
+    def on_mount(self) -> None:
+        self.query_one("#show-queue").border_title = "Show"
+        self.query_one("#shuffle-queue").border_subtitle = "queue"
 
 class RightPane(Widget):
     pass
@@ -180,8 +209,25 @@ class LyricBox(Widget):
         next_text = f"*{lyrics[idx + 1][1]}*  " if idx < len(lyrics) - 1 else ""
 
         content = "\n".join(filter(bool, [prev_text, curr_text, next_text]))
-        logger(content)
         self.query_one(Markdown).update(content)
+
+class LeftPane(Widget):
+    pass
+class QueueBox(VerticalScroll):
+    """View the current song queue"""
+    def compose(self) -> ComposeResult:
+        with RadioSet(disabled=True):
+            yield RadioButton("Battlestar Galactica")
+            yield RadioButton("Dune 1984")
+            yield RadioButton("Serenity", value=True)
+            yield RadioButton("Star Trek: The Motion Picture")
+            yield RadioButton("Star Trek: The Motion Picture")
+            yield RadioButton("Star Trek: The Motion Picture")
+
+
+    def on_mount(self) -> None:
+        self.border_title = "Queue"
+        # self.query_one(RadioSet).mount(RadioButton("Hello"))
 
 class TopBox(Widget):
     """Class containing album and song list"""
@@ -190,7 +236,9 @@ class TopBox(Widget):
         self.data_dict = load_library(path)
 
     def compose(self) -> ComposeResult:
-        yield AlbumList(self.data_dict)
+        with LeftPane():
+            yield AlbumList(self.data_dict)
+            yield QueueBox()
         with RightPane():
             yield SongList(self.data_dict)
             yield LyricBox()
@@ -212,10 +260,9 @@ class TopBox(Widget):
             song_name = str(event.option.prompt)
             play_song(self.data_dict, song_name)
             # TODO: add song queue logic here
-            # TODO: load song lyrics here
+            # load song lyrics
             path = next((songs[song_name] for album in self.data_dict.values() for songs in [album['songs']] if song_name in songs), "bruhhh")
             self.query_one(LyricBox).current_song_path = path
-            logger(path)
 
     def on_mount(self)->None:
         album_data = list(self.data_dict.values())
@@ -227,6 +274,7 @@ class BottomBox(Widget):
     def compose(self) -> ComposeResult:
         yield PlayControls()
         yield Playback()
+        yield QueueOptions()
 
 class DirectoryDialog(ModalScreen[str]):
     def compose(self) -> ComposeResult:
@@ -254,8 +302,10 @@ class MusicApp(App):
         ("n", "backward", "Backward"),
         ("space", "pause", "Pause"),
         ("m", "forward", "Forward"),
-
+        ("q", "show_queue", "Show Queue"),
+        ("alt+q", "shuffle_queue", "Shuffle Queue"),
     ]
+    AUTO_FOCUS: str | None = "#modal_input"
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -269,6 +319,10 @@ class MusicApp(App):
         self.query_one(PlayControls).query("Button")[2].press()
     def action_backward(self) -> None:
         self.query_one(PlayControls).query("Button")[0].press()
+    def action_show_queue(self) -> None:
+        self.query_one(QueueOptions).query_one("#show-queue").press()
+    def action_shuffle_queue(self) -> None:
+        self.query_one(QueueOptions).query_one("#shuffle-queue").press()
 
     def on_mount(self) -> None:
         self.push_screen(DirectoryDialog(), self.on_directory_chosen)
@@ -279,6 +333,17 @@ class MusicApp(App):
         self.mount(TopBox(self.library_path), before=self.query_one(BottomBox))
         # set library here
 
+    def on_button_pressed(self, event: Button.Pressed)->None:
+        """handle button presses"""
+
+        # show queue if button pressed
+        if event.button.id == "show-queue":
+            album_obj = self.query_one(AlbumList)
+            # logger(f"{album_obj.styles.width.value}, {album_obj.styles.width.unit}, {album_obj.styles.width.percent_unit}")
+            if album_obj.styles.width == Scalar(value=100.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH):
+                album_obj.styles.width = Scalar(value=40.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH)
+            else:
+                album_obj.styles.width = Scalar(value=100.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH)
 
 if __name__ == "__main__":
     app = MusicApp()

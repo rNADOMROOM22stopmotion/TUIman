@@ -3,4 +3,5 @@
 .idea
 data
 utils/__pycache__
+__pycache__
 log.txt
