@@ -43,7 +43,7 @@ class AlbumCover(Widget):
     path: reactive[str] = reactive("./media/unknown.png") #default album art
     def render(self) -> RenderResult:
         """load album art and display album cover"""
-        album_cover = Pixels.from_image_path(self.path, resize=(20, 15))
+        album_cover = Pixels.from_image_path(self.path or "./media/unknown.png", resize=(20, 15))
         return album_cover
 
 
@@ -236,7 +236,7 @@ class DirectoryDialog(ModalScreen[str]):
         #TODO: add textual-autocomplete
 
     def on_button_pressed(self) -> None:
-        path = self.query_one(Input).value.strip()
+        path = os.path.abspath(os.path.expanduser(self.query_one(Input).value.strip().strip("'\"")))
         if os.path.isdir(path):
             self.dismiss(path)  # sends path back to the MusicApp
         else:
