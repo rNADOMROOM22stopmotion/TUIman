@@ -1,7 +1,10 @@
-import os
+from pathlib import Path
 from pprint import pprint
 
 from textual.widgets import Input, OptionList
+
+SUPPORTED_AUDIO_EXTENSIONS = {".mp3"}
+SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 
 def search_function(object, event: Input.Changed, iterables) -> None:
@@ -19,32 +22,46 @@ def search_function(object, event: Input.Changed, iterables) -> None:
     for song_or_album in filtered:
         option_list.add_option(song_or_album)
 
+def _load_album(album_path: Path) -> dict | None:
+    songs = {}
+    album_art = ""
+
+    for entry in sorted(album_path.iterdir(), key=lambda e: e.name.casefold()):
+        if not entry.is_file():
+            continue
+
+        extension = entry.suffix.casefold()
+        if extension in SUPPORTED_IMAGE_EXTENSIONS and not album_art:
+            album_art = str(entry)
+            continue
+
+        if extension not in SUPPORTED_AUDIO_EXTENSIONS:
+            continue
+
+        songs[entry.stem] = str(entry)
+
+    if not songs:
+        return None
+
+    return {
+        "songs": songs,
+        "album_art": album_art,
+    }
+
+
 def load_library(root_dir: str) -> dict:
     library = {}
-    for album in sorted(os.scandir(root_dir), key=lambda e: e.name):
-        if not album.is_dir():
-            continue
-        songs = {}
-        album_art = ""
+    root_path = Path(root_dir).expanduser().resolve()
 
-        # Scan through all entries in the album directory, sorted by name
-        entries = sorted(os.scandir(album.path), key=lambda e: e.name)
-        for entry in entries:
-            if not entry.is_file():
-                continue
-            filename = entry.name.lower()
-            if filename.endswith(".jpg") or filename.endswith(".png"):
-                album_art = entry.path
-            if not filename.endswith(".mp3"):
-                continue
-            song_name = os.path.splitext(entry.name)[0]
-            # Store in dictionary: {song_name: full_path}
-            songs[song_name] = entry.path
-        if songs:
-            library[album.name] = {
-                "songs": songs,
-                "album_art": album_art
-            }
+    album_paths = [entry for entry in root_path.iterdir() if entry.is_dir()]
+    if not album_paths:
+        album_paths = [root_path]
+
+    for album_path in sorted(album_paths, key=lambda e: e.name.casefold()):
+        album = _load_album(album_path)
+        if album is None:
+            continue
+        library[album_path.name] = album
     return library
 
 
