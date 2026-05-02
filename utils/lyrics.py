@@ -1,9 +1,43 @@
 import os
+import re
 from pprint import pprint
+import httpx
 import mutagen.id3
 
+BASE_URL = "https://lrclib.net/api/search"
 
-def extract_lyrics(path: str) -> dict:
+async def lrclib(**kwargs)->str:
+    params = {
+    "track_name": kwargs.get("title", None),
+    "artist_name": kwargs.get("artist", None),
+    "album_name": kwargs.get("album", None)
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(BASE_URL, params=params)
+        response.raise_for_status()
+        data = response.json()
+        first_match = data[0].get("syncedLyrics") if data else None
+        return first_match
+
+async def parse_lrc_lyrics(lrc_text: str) -> list[tuple[float, str]]:
+    pattern = re.compile(r'\[(\d+):(\d+\.\d+)\]\s*(.*)')
+    results = []
+
+    for line in lrc_text.splitlines():
+        m = pattern.match(line.strip())
+        if not m:
+            continue
+        minutes, seconds, text = int(m.group(1)), float(m.group(2)), m.group(3).strip()
+        if text:
+            ts = round(minutes * 60 + seconds, 2)
+            results.append((ts, text))
+
+    return sorted(results, key=lambda x: x[0])
+
+    return sorted(results, key=lambda x: x[1])
+
+async def extract_lyrics(path: str) -> dict:
     """
     Extracts synced lyrics from an mp3's ID3 tags (SYLT frame).
     Falls back to unsynced lyrics (USLT) with timestamp 0.0 if no SYLT found.
@@ -17,8 +51,10 @@ def extract_lyrics(path: str) -> dict:
     except mutagen.id3.ID3NoHeaderError:
         return {"lyrics": []}
 
-    # synced lyrics — SYLT stores (text, timestamp_in_ms) tuples
+    # synced lyrics — stores (text, timestamp_in_ms) tuples
+    song_meta = {}
     for key in tags.keys():
+        # synced lyrics found
         if key.startswith("SYLT"):
             sylt = tags[key]
             lyrics = [
@@ -28,14 +64,23 @@ def extract_lyrics(path: str) -> dict:
             ]
             lyrics.sort(key=lambda x: x[0])
             return {"lyrics": lyrics}
+        else:
+            #track name
+            if key.startswith("TIT2"):
+                song_meta["title"] = tags[key].text
+            #artist name
+            if key.startswith("TPE1"):
+                song_meta["artist"] = tags[key].text
+            #album name
+            if key.startswith("TALB"):
+                song_meta["album"] = tags[key].text
 
-    # fallback: unsynced lyrics (USLT) — no timestamps available
-    for key in tags.keys():
-        if key.startswith("USLT"):
-            uslt = tags[key]
-            lines = [line.strip() for line in uslt.text.splitlines() if line.strip()]
-            lyrics = [{"time": 0.0, "text": line} for line in lines]
-            return {"lyrics": lyrics}
+    # Try to fetch lyrics from LRCLIB
+    synced_lyrics = await lrclib(**song_meta)
+    if synced_lyrics:
+        lyrics = await parse_lrc_lyrics(lrc_text=synced_lyrics)
+        return {"lyrics": lyrics}
+
 
     return {"lyrics": []}
 
@@ -43,10 +88,4 @@ if "__main__" == __name__:
     # pprint(extract_lyrics("../data/album2/Human Nature - lyrics.mp3"))
     # {'lyrics': [(10.72, 'Looking out'),
     #             (13.35, 'Across the nighttime'),
-    #             (16.06, 'The city winks a sleepless eye'),
-    #             (21.01, 'Hear her voice'),
-    #             (24.05, 'Shake my window'),
-    #             (26.55, 'Sweet seducing sighs'),
-    #             (31.33, 'Get me out'),
-    #             (34.29, 'Into the nighttime'),
     pprint(extract_lyrics(""))

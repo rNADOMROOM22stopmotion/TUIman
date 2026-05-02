@@ -83,11 +83,11 @@ class LyricBox(Widget):
         super().__init__()
         self.parsed_lyrics = []
 
-    def watch_current_song_path(self, path: str) -> None:
+    async def watch_current_song_path(self, path: str) -> None:
         """Re-parse lyrics whenever the song changes"""
         self.current_index = -1  # reset index for new song
         if path:
-            self.parsed_lyrics = extract_lyrics(path=path)['lyrics']
+            self.parsed_lyrics = (await extract_lyrics(path=path))['lyrics']
         else:
             self.parsed_lyrics = []
 
