@@ -252,6 +252,12 @@ class TopBox(Widget):
 
     def watch_song_over(self)->None:
         """watches song_over flag, if changed, plays next song in queue"""
+        if not self.song_over:
+            return
+
         self.song_over = False
+        if self.queue_gen is None:
+            return
+
         self.song_manager(song_name=next(self.queue_gen))
 
