@@ -1,6 +1,5 @@
 import pygame
 from typing import Optional
-import mutagen
 
 # module-level state
 _current_album: Optional[str] = None
@@ -29,9 +28,12 @@ def play_song(data_dict: dict, song_name: str) -> bool:
             _current_song = song_name
             _paused = False
 
-            # cache duration at load time
-            audio = mutagen.File(path)
-            _current_duration = audio.info.length if audio else 0.0
+            # old code to cache duration at load time (mutagen was returning 0.0 for really short audios)
+            # audio = mutagen.File(path)
+            # _current_duration = audio.info.length if audio else 0.0
+
+            sound = pygame.mixer.Sound(path)
+            _current_duration = sound.get_length()
 
             return True
 
@@ -72,8 +74,11 @@ def get_progress() -> tuple[float, float, bool]:
     if _current_song is None:
         return (0.0, 0.0, False)
 
+    track_ended = False
     raw_pos = pygame.mixer.music.get_pos()
-    track_ended = raw_pos == -1 and not _paused and _current_song is not None
     elapsed = max(0.0, raw_pos / 1000.0)
 
-    return (elapsed, _current_duration, track_ended)
+    if elapsed > _current_duration:
+        track_ended = True
+
+    return elapsed, _current_duration, track_ended

@@ -1,3 +1,6 @@
+from itertools import cycle
+
+from httpcore import ReadTimeout
 from rich_pixels import Pixels
 from textual.app import ComposeResult, RenderResult
 from textual.containers import VerticalScroll
@@ -70,7 +73,7 @@ class SongList(Widget):
         option_list = self.query_one(OptionList)
         option_list.clear_options()
         self.current_songs = []
-        for song in songs:
+        for song in sorted(songs):
             self.current_songs.append(song)
             option_list.add_option(song)
 
@@ -94,7 +97,10 @@ class LyricBox(Widget):
             if cached_lyrics:
                 self.parsed_lyrics = cached_lyrics
             else:
-                self.parsed_lyrics = (await extract_lyrics(path=path))['lyrics']
+                try:
+                    self.parsed_lyrics = (await extract_lyrics(path=path))['lyrics']
+                except ReadTimeout:
+                    self.parsed_lyrics = []
         else:
             self.parsed_lyrics = []
 
@@ -104,13 +110,18 @@ class LyricBox(Widget):
     def on_mount(self) -> None:
         self.border_title = "Lyrics"
         # Poll every 1/30ms
-        self.set_interval(1/30, self.update_lyrics)
+        self.set_interval(1/60, self.update_lyrics)
 
     def update_lyrics(self) -> None:
         if not self.parsed_lyrics:
             return
 
-        now = get_progress()[0]  # how much the song has finished
+        progress = get_progress()
+
+        if progress[2]: # song ended
+            return
+
+        now = progress[0]  # how much the song has finished
 
         # Find the latest lyric whose time <= now
         idx = -1
@@ -158,9 +169,13 @@ class QueueBox(VerticalScroll):
 
 class TopBox(Widget):
     """Class containing album and song list"""
+
+    song_over: reactive = reactive(False, init=False)
     def __init__(self, path: str) -> None:
         super().__init__()
+        self.queue_gen = None
         self.data_dict = load_library(path)
+        self.song_queue = []
 
     def compose(self) -> ComposeResult:
         with LeftPane():
@@ -171,15 +186,43 @@ class TopBox(Widget):
             yield LyricBox()
         yield AlbumCover()
 
+    def on_mount(self) -> None:
+        album_data = list(self.data_dict.values())
+        if album_data:
+            self.query_one(AlbumCover).path = album_data[0]['album_art']
+        self.set_interval(1/60, self.song_status)
+
+## HELPER FUNCTIONS ##
+
     def song_manager(self, song_name: str) -> None:
         """ plays song, updates queue, loads lyrics"""
         # play song using player
         play_song(data_dict=self.data_dict, song_name=song_name)
-        # TODO: add song queue logic here
         # load song lyrics
         path = next(
             (songs[song_name] for album in self.data_dict.values() for songs in [album['songs']] if song_name in songs), "")
         self.query_one(LyricBox).current_song_path = path
+
+    def set_album_queue(self, song_name: str):
+        for album in self.data_dict.values():
+            songs = album.get('songs', {})
+            if song_name in songs:
+                song_list = sorted(songs.keys())
+                idx = song_list.index(song_name)
+                self.song_queue = song_list[idx:] + song_list[:idx]
+                return
+
+    @staticmethod
+    def cycle_queue(lst):
+        for value in cycle(lst):
+            yield value
+
+    @staticmethod
+    def logger(text) -> None:
+        with open("log.txt", "w") as f:
+            f.write(f"{text}\n")
+## HELPER FUNCTIONS END ##
+
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         # Make sure the event came from AlbumList, not SongList's OptionList
@@ -195,11 +238,20 @@ class TopBox(Widget):
         # If SongList option, selected, play song
         if event.control in self.query_one(SongList).query(OptionList):
             song_name = str(event.option.prompt)
-            self.song_manager(song_name=song_name)
+            # generating song queue
+            self.set_album_queue(song_name=song_name)
+            self.queue_gen = self.cycle_queue(self.song_queue)
+            self.logger(self.song_queue)
+            self.song_manager(song_name=next(self.queue_gen))
 
+    def song_status(self):
+        """checks if song is over"""
+        progress = get_progress()
+        if progress[2] and progress[1] != 0.0:
+            self.song_over = True
 
-    def on_mount(self)->None:
-        album_data = list(self.data_dict.values())
-        if album_data:
-            self.query_one(AlbumCover).path = album_data[0]['album_art']
+    def watch_song_over(self)->None:
+        """watches song_over flag, if changed, plays next song in queue"""
+        self.song_over = False
+        self.song_manager(song_name=next(self.queue_gen))
 

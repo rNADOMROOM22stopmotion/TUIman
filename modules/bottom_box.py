@@ -41,7 +41,7 @@ class Playback(Widget):
 
     def on_mount(self) -> None:
         """Progress bar"""
-        self.set_interval(1 / 30, self.make_progress)
+        self.set_interval(1 /60, self.make_progress)
         self.set_interval(1/10 , self.sync_song)
 
     def make_progress(self) -> None:

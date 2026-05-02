@@ -3,6 +3,8 @@ import re
 from pprint import pprint
 import httpx
 import mutagen.id3
+from httpcore import ReadTimeout
+
 from utils.caching import LyricsCache
 
 BASE_URL = "https://lrclib.net/api/search"
@@ -80,7 +82,10 @@ async def extract_lyrics(path: str) -> dict:
                 song_meta["album"] = tags[key].text
 
     # Try to fetch lyrics from LRCLIB
-    synced_lyrics = await lrclib(**song_meta)
+    try:
+        synced_lyrics = await lrclib(**song_meta)
+    except ReadTimeout:
+        synced_lyrics = []
     if synced_lyrics:
         lyrics = await parse_lrc_lyrics(lrc_text=synced_lyrics)
         # caching those lyrics
