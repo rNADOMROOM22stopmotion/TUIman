@@ -4,10 +4,12 @@ from textual.containers import VerticalScroll
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown
+from utils.caching import LyricsCache
 from utils.library_manager import search_function, load_library
 from utils.lyrics import extract_lyrics
 from utils.player import get_progress, play_song
 
+lyrics_cache = LyricsCache()
 
 class AlbumCover(Widget):
     """using rich renderable to render ascii album cover"""
@@ -87,7 +89,12 @@ class LyricBox(Widget):
         """Re-parse lyrics whenever the song changes"""
         self.current_index = -1  # reset index for new song
         if path:
-            self.parsed_lyrics = (await extract_lyrics(path=path))['lyrics']
+            # Check .cache for lyrics, if found, skip extract_lyrics
+            cached_lyrics = await lyrics_cache.find_cache(song_path=self.current_song_path)
+            if cached_lyrics:
+                self.parsed_lyrics = cached_lyrics
+            else:
+                self.parsed_lyrics = (await extract_lyrics(path=path))['lyrics']
         else:
             self.parsed_lyrics = []
 

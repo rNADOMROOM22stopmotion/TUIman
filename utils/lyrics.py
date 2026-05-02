@@ -3,8 +3,10 @@ import re
 from pprint import pprint
 import httpx
 import mutagen.id3
+from utils.caching import LyricsCache
 
 BASE_URL = "https://lrclib.net/api/search"
+lyrics_cache = LyricsCache()
 
 async def lrclib(**kwargs)->str:
     params = {
@@ -35,13 +37,13 @@ async def parse_lrc_lyrics(lrc_text: str) -> list[tuple[float, str]]:
 
     return sorted(results, key=lambda x: x[0])
 
-    return sorted(results, key=lambda x: x[1])
 
 async def extract_lyrics(path: str) -> dict:
     """
     Extracts synced lyrics from an mp3's ID3 tags (SYLT frame).
-    Falls back to unsynced lyrics (USLT) with timestamp 0.0 if no SYLT found.
-    Returns {"lyrics": [{"time": float, "text": str}, ...]}
+    Falls back to LRCLIB
+    Stores lyrics in .cache
+    Returns {"lyrics": [(time_ms: float, "text": str), ...]}
     """
     if not os.path.exists(path):
         return {"lyrics": []}
@@ -63,6 +65,8 @@ async def extract_lyrics(path: str) -> dict:
                 if text.strip()
             ]
             lyrics.sort(key=lambda x: x[0])
+            # caching those lyrics
+            await lyrics_cache.create_cache(song_path=path, lyrics=lyrics)
             return {"lyrics": lyrics}
         else:
             #track name
@@ -79,6 +83,8 @@ async def extract_lyrics(path: str) -> dict:
     synced_lyrics = await lrclib(**song_meta)
     if synced_lyrics:
         lyrics = await parse_lrc_lyrics(lrc_text=synced_lyrics)
+        # caching those lyrics
+        await lyrics_cache.create_cache(song_path=path, lyrics=lyrics)
         return {"lyrics": lyrics}
 
 

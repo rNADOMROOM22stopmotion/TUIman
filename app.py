@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.css.scalar import Scalar, Unit
 from textual.screen import ModalScreen
@@ -22,9 +22,11 @@ class DirectoryDialog(ModalScreen[str]):
         #TODO: add textual-autocomplete
 
     def on_button_pressed(self) -> None:
-        path = os.path.abspath(os.path.expanduser(self.query_one(Input).value.strip().strip("'\"")))
-        if os.path.isdir(path):
-            self.dismiss(path)  # sends path back to the MusicApp
+        raw = self.query_one(Input).value.strip().strip("'\"")
+        path = Path(raw).expanduser().resolve()
+
+        if path.is_dir():
+            self.dismiss(str(path))
         else:
             self.query_one(Label).update(" ❌ Invalid path, try again:")
 
