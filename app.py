@@ -101,8 +101,8 @@ class MusicApp(App):
                 event.button.styles.color = Color(255, 255, 255, 0.7)
                 resume()
 
-        tb = self.query_one(TopBox)
         if "playback" in event.button.classes:
+            tb = self.query_one(TopBox)
             # forward backward logic
             queue = getattr(tb, "queue_iterator", None)
 
@@ -112,6 +112,7 @@ class MusicApp(App):
                 tb.song_manager(song_name=next(queue))
 
         if "queue-btn" in event.button.classes:
+            tb = self.query_one(TopBox)
             # shuffle logic, shuffles the queue, updates queue iterator and plays song using it.
             if tb.song_queue:
                 if event.button.id == "shuffle-queue":

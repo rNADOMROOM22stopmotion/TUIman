@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 from pprint import pprint
@@ -16,7 +17,7 @@ async def lrclib(**kwargs)->str:
     "album_name": kwargs.get("album", None)
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=15.0)) as client:
         response = await client.get(BASE_URL, params=params)
         response.raise_for_status()
         data = response.json()
@@ -98,4 +99,11 @@ if "__main__" == __name__:
     # pprint(extract_lyrics("../data/album2/Human Nature - lyrics.mp3"))
     # {'lyrics': [(10.72, 'Looking out'),
     #             (13.35, 'Across the nighttime'),
-    pprint(extract_lyrics(""))
+    # pprint(extract_lyrics(""))
+    lyrics = asyncio.run(lrclib(
+            title="",
+            artist="",
+            album=""
+        ))
+    print(lyrics)
+    # print(asyncio.run(extract_lyrics(path= "../data/exeter/IMAGINARY.mp3")))
