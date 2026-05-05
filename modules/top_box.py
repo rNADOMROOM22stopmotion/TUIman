@@ -197,6 +197,15 @@ class TopBox(Widget):
 
 ## HELPER FUNCTIONS ##
 
+    def update_queue_box(self, song_name:str):
+        qb = self.query_one(QueueBox).query_one(RadioSet)
+        qb.remove_children()
+        for song in self.song_queue:
+            if song == song_name:
+                qb.mount(RadioButton(f"{song}", value=True))
+            else:
+                qb.mount(RadioButton(f"{song}"))
+
     def song_manager(self, song_name: str) -> None:
         """ plays song, updates queue, loads lyrics"""
         # play song using player
@@ -206,13 +215,7 @@ class TopBox(Widget):
             (songs[song_name] for album in self.data_dict.values() for songs in [album['songs']] if song_name in songs), "")
         self.query_one(LyricBox).current_song_path = path
         # update queue box
-        qb = self.query_one(QueueBox).query_one(RadioSet)
-        qb.remove_children()
-        for song in sorted(self.data_dict[self.current_album]['songs']):
-            if song == song_name:
-                qb.mount(RadioButton(f"{song}", value=True))
-            else:
-                qb.mount(RadioButton(f"{song}"))
+        self.update_queue_box(song_name=song_name)
 
     def set_album_queue(self, song_name: str):
         for album in self.data_dict.values():

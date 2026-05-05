@@ -73,7 +73,7 @@ def get_current() -> dict:
 def get_progress() -> tuple[float, float, bool]:
     """Returns (elapsed_seconds, total_seconds, track_ended)."""
     if _current_song is None:
-        return (0.0, 0.0, False)
+        return 0.0, 0.0, False
 
     track_ended = False
     raw_pos = pygame.mixer.music.get_pos()

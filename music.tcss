@@ -75,7 +75,7 @@ QueueOptions {
     layout: horizontal;
     align-horizontal: right;
     margin-right: 1;
-    width: 20%;
+    width: 23;
     dock: right;
 }
 

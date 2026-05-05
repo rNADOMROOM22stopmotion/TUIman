@@ -1,5 +1,5 @@
 from textual.app import ComposeResult
-from textual.color import Gradient, Color
+from textual.color import Gradient
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Button, Label, ProgressBar

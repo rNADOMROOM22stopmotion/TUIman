@@ -1,4 +1,7 @@
+import random
 from pathlib import Path
+from random import shuffle
+
 from textual.app import App, ComposeResult
 from textual.color import Color
 from textual.css.scalar import Scalar, Unit
@@ -99,15 +102,22 @@ class MusicApp(App):
                 event.button.styles.color = Color(255, 255, 255, 0.7)
                 resume()
 
+        tb = self.query_one(TopBox)
         if "playback" in event.button.classes:
             # forward backward logic
-            tb = self.query_one(TopBox)
             queue = getattr(tb, "queue_iterator", None)
 
             if queue is not None:
                 if event.button.id == "backward":
                     queue.pos = (queue.pos - 2) % len(queue.lst)
                 tb.song_manager(song_name=next(queue))
+
+        if "queue-btn" in event.button.classes:
+            # shuffle logic
+            if tb.song_queue:
+                if event.button.id == "shuffle-queue":
+                    random.shuffle(tb.song_queue)
+                    tb.song_manager(song_name=tb.song_queue[0])
 
 if __name__ == "__main__":
     app = MusicApp()
