@@ -1,3 +1,4 @@
+import mutagen
 import pygame
 from typing import Optional
 
@@ -29,11 +30,11 @@ def play_song(data_dict: dict, song_name: str) -> bool:
             _paused = False
 
             # old code to cache duration at load time (mutagen was returning 0.0 for really short audios)
-            # audio = mutagen.File(path)
-            # _current_duration = audio.info.length if audio else 0.0
+            audio = mutagen.File(path)
+            _current_duration = audio.info.length if audio else 0.0
 
-            sound = pygame.mixer.Sound(path)
-            _current_duration = sound.get_length()
+            # sound = pygame.mixer.Sound(path)
+            # _current_duration = sound.get_length()
 
             return True
 

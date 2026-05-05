@@ -3,30 +3,15 @@ from textual.color import Gradient, Color
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Button, Label, ProgressBar
-from utils.player import pause, get_progress, resume, get_current
+from utils.player import get_progress, get_current
 
 
 class PlayControls(Widget):
     """Pause/resume, forward/backward controls"""
     def compose(self) -> ComposeResult:
-        yield Button("⏮", variant="primary", flat=True)
-        yield Button("||", id="pause", variant="success", flat=True)
-        yield Button("⏭", variant="primary", flat=True)
-
-    @staticmethod
-    def on_button_pressed(event: Button.Pressed) -> None:
-        """handles button state and pauses/ plays music"""
-        if event.button.id == "pause":
-            if event.button.label == "||":
-                event.button.label = "▶"
-                event.button.styles.border = ("round", "yellow")
-                event.button.styles.color = "deeppink"
-                pause()
-            else:
-                event.button.label = "||"
-                event.button.styles.border = ("round", "deeppink")
-                event.button.styles.color = Color(255, 255, 255, 0.7)
-                resume()
+        yield Button("⏮", id="backward", classes="playback", variant="primary", flat=True)
+        yield Button("||", id="pause",variant="success", flat=True)
+        yield Button("⏭", id="forward", classes="playback",variant="primary", flat=True)
 
 
 class Playback(Widget):
@@ -41,8 +26,8 @@ class Playback(Widget):
 
     def on_mount(self) -> None:
         """Progress bar"""
-        self.set_interval(1 /60, self.make_progress)
-        self.set_interval(1/10 , self.sync_song)
+        self.set_interval(1 /30, self.make_progress)
+        self.set_interval(1/30 , self.sync_song)
 
     def make_progress(self) -> None:
         """Called automatically to advance the progress bar."""

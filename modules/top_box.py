@@ -1,5 +1,3 @@
-from itertools import cycle
-
 from httpcore import ReadTimeout
 from rich_pixels import Pixels
 from textual.app import ComposeResult, RenderResult
@@ -10,17 +8,28 @@ from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown
 from utils.caching import LyricsCache
 from utils.library_manager import search_function, load_library
 from utils.lyrics import extract_lyrics
+from utils.models import ReversibleIterator
 from utils.player import get_progress, play_song
 
 lyrics_cache = LyricsCache()
 
 class AlbumCover(Widget):
     """using rich renderable to render ascii album cover"""
-    path: reactive[str] = reactive("./media/unknown.png") #default album art
+    path: reactive[str] = reactive("./media/unknown.png")
+
+    def __init__(self):
+        super().__init__()
+        self._album_cover = None
+
+    def on_mount(self) -> None:
+        self._album_cover = Pixels.from_image_path("./media/unknown.png", resize=(20, 15))
+
+    def watch_path(self, new_path: str) -> None:
+        self._album_cover = Pixels.from_image_path(new_path or "./media/unknown.png", resize=(20, 15))
+        self.refresh()
+
     def render(self) -> RenderResult:
-        """load album art and display album cover"""
-        album_cover = Pixels.from_image_path(self.path or "./media/unknown.png", resize=(20, 15))
-        return album_cover
+        return self._album_cover
 
 class AlbumList(Widget):
     """Lists user albums"""
@@ -110,7 +119,7 @@ class LyricBox(Widget):
     def on_mount(self) -> None:
         self.border_title = "Lyrics"
         # Poll every 1/30ms
-        self.set_interval(1/60, self.update_lyrics)
+        self.set_interval(1/30, self.update_lyrics)
 
     def update_lyrics(self) -> None:
         if not self.parsed_lyrics:
@@ -154,14 +163,7 @@ class LeftPane(Widget):
 class QueueBox(VerticalScroll):
     """View the current song queue"""
     def compose(self) -> ComposeResult:
-        with RadioSet(disabled=True):
-            yield RadioButton("Battlestar Galactica")
-            yield RadioButton("Dune 1984")
-            yield RadioButton("Serenity", value=True)
-            yield RadioButton("Star Trek: The Motion Picture")
-            yield RadioButton("Star Trek: The Motion Picture")
-            yield RadioButton("Star Trek: The Motion Picture")
-
+        yield RadioSet(disabled=True)
 
     def on_mount(self) -> None:
         self.border_title = "Queue"
@@ -173,7 +175,8 @@ class TopBox(Widget):
     song_over: reactive = reactive(False, init=False)
     def __init__(self, path: str) -> None:
         super().__init__()
-        self.queue_gen = None
+        self.current_album: str
+        self.queue_iterator: ReversibleIterator
         self.data_dict = load_library(path)
         self.song_queue = []
 
@@ -190,7 +193,7 @@ class TopBox(Widget):
         album_data = list(self.data_dict.values())
         if album_data:
             self.query_one(AlbumCover).path = album_data[0]['album_art']
-        self.set_interval(1/60, self.song_status)
+        self.set_interval(1/30, self.song_status)
 
 ## HELPER FUNCTIONS ##
 
@@ -202,6 +205,14 @@ class TopBox(Widget):
         path = next(
             (songs[song_name] for album in self.data_dict.values() for songs in [album['songs']] if song_name in songs), "")
         self.query_one(LyricBox).current_song_path = path
+        # update queue box
+        qb = self.query_one(QueueBox).query_one(RadioSet)
+        qb.remove_children()
+        for song in sorted(self.data_dict[self.current_album]['songs']):
+            if song == song_name:
+                qb.mount(RadioButton(f"{song}", value=True))
+            else:
+                qb.mount(RadioButton(f"{song}"))
 
     def set_album_queue(self, song_name: str):
         for album in self.data_dict.values():
@@ -211,11 +222,6 @@ class TopBox(Widget):
                 idx = song_list.index(song_name)
                 self.song_queue = song_list[idx:] + song_list[:idx]
                 return
-
-    @staticmethod
-    def cycle_queue(lst):
-        for value in cycle(lst):
-            yield value
 
     @staticmethod
     def logger(text) -> None:
@@ -228,6 +234,7 @@ class TopBox(Widget):
         # Make sure the event came from AlbumList, not SongList's OptionList
         if event.control in self.query_one(AlbumList).query(OptionList):
             album_name = str(event.option.prompt)
+            self.current_album = album_name
             # Update SongList UI
             song_list_obj = self.query_one(SongList)
             song_list_obj.update_song_list(album_name)
@@ -240,9 +247,9 @@ class TopBox(Widget):
             song_name = str(event.option.prompt)
             # generating song queue
             self.set_album_queue(song_name=song_name)
-            self.queue_gen = self.cycle_queue(self.song_queue)
-            self.logger(self.song_queue)
-            self.song_manager(song_name=next(self.queue_gen))
+            self.queue_iterator = ReversibleIterator(lst=self.song_queue)
+            # self.logger(self.song_queue)
+            self.song_manager(song_name=next(self.queue_iterator))
 
     def song_status(self):
         """checks if song is over"""
@@ -256,8 +263,8 @@ class TopBox(Widget):
             return
 
         self.song_over = False
-        if self.queue_gen is None:
+        if self.queue_iterator is None:
             return
 
-        self.song_manager(song_name=next(self.queue_gen))
+        self.song_manager(song_name=next(self.queue_iterator))
 

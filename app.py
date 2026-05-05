@@ -1,11 +1,12 @@
 from pathlib import Path
 from textual.app import App, ComposeResult
+from textual.color import Color
 from textual.css.scalar import Scalar, Unit
 from textual.screen import ModalScreen
 from textual.widgets import Header, Footer, Input, Label, Button
 from modules.bottom_box import BottomBox, PlayControls, QueueOptions
 from modules.top_box import TopBox, AlbumList
-from utils.player import init_player
+from utils.player import init_player, pause, resume
 
 init_player()
 
@@ -76,7 +77,7 @@ class MusicApp(App):
     def on_button_pressed(self, event: Button.Pressed)->None:
         """handle button presses"""
 
-        # show queue if button pressed
+        # show Queue if button pressed
         if event.button.id == "show-queue":
             album_obj = self.query_one(AlbumList)
             # logger(f"{album_obj.styles.width.value}, {album_obj.styles.width.unit}, {album_obj.styles.width.percent_unit}")
@@ -84,6 +85,29 @@ class MusicApp(App):
                 album_obj.styles.width = Scalar(value=40.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH)
             else:
                 album_obj.styles.width = Scalar(value=100.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH)
+
+        # play/pause, forward backward buttons
+        if event.button.id == "pause":
+            if event.button.label == "||":
+                event.button.label = "▶"
+                event.button.styles.border = ("round", "yellow")
+                event.button.styles.color = "deeppink"
+                pause()
+            else:
+                event.button.label = "||"
+                event.button.styles.border = ("round", "deeppink")
+                event.button.styles.color = Color(255, 255, 255, 0.7)
+                resume()
+
+        if "playback" in event.button.classes:
+            # forward backward logic
+            tb = self.query_one(TopBox)
+            queue = getattr(tb, "queue_iterator", None)
+
+            if queue is not None:
+                if event.button.id == "backward":
+                    queue.pos = (queue.pos - 2) % len(queue.lst)
+                tb.song_manager(song_name=next(queue))
 
 if __name__ == "__main__":
     app = MusicApp()
