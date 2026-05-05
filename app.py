@@ -1,7 +1,5 @@
 import random
 from pathlib import Path
-from random import shuffle
-
 from textual.app import App, ComposeResult
 from textual.color import Color
 from textual.css.scalar import Scalar, Unit
@@ -9,6 +7,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Header, Footer, Input, Label, Button
 from modules.bottom_box import BottomBox, PlayControls, QueueOptions
 from modules.top_box import TopBox, AlbumList
+from utils.models import ReversibleIterator
 from utils.player import init_player, pause, resume
 
 init_player()
@@ -52,8 +51,8 @@ class MusicApp(App):
     AUTO_FOCUS: str | None = "#modal_input"
 
     def compose(self) -> ComposeResult:
-        yield Header()
-        yield Footer()
+        # yield Header()
+        # yield Footer()
         # topbox
         yield BottomBox()
 
@@ -113,11 +112,12 @@ class MusicApp(App):
                 tb.song_manager(song_name=next(queue))
 
         if "queue-btn" in event.button.classes:
-            # shuffle logic
+            # shuffle logic, shuffles the queue, updates queue iterator and plays song using it.
             if tb.song_queue:
                 if event.button.id == "shuffle-queue":
                     random.shuffle(tb.song_queue)
-                    tb.song_manager(song_name=tb.song_queue[0])
+                    tb.queue_iterator = ReversibleIterator(lst=tb.song_queue)
+                    tb.song_manager(song_name=next(tb.queue_iterator))
 
 if __name__ == "__main__":
     app = MusicApp()
