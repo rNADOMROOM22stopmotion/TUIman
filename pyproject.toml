@@ -11,5 +11,6 @@ dependencies = [
     "pygame-ce>=2.5.7",
     "rich-pixels>=3.0.1",
     "textual>=8.2.4",
+    "textual-autocomplete>=4.0.6",
     "textual-dev>=1.8.0",
 ]

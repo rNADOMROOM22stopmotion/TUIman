@@ -5,10 +5,10 @@ from pprint import pprint
 import httpx
 import mutagen.id3
 from httpx import ReadTimeout
-from utils.caching import LyricsCache
+from utils.caching import Cache
 
 BASE_URL = "https://lrclib.net/api/search"
-lyrics_cache = LyricsCache()
+lyrics_cache = Cache()
 
 async def lrclib(**kwargs)->str:
     params = {

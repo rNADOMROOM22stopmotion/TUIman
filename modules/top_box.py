@@ -5,13 +5,13 @@ from textual.containers import VerticalScroll
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown
-from utils.caching import LyricsCache
+from utils.caching import Cache
 from utils.library_manager import search_function, load_library
 from utils.lyrics import extract_lyrics
 from utils.models import ReversibleIterator
 from utils.player import get_progress, play_song
 
-lyrics_cache = LyricsCache()
+lyrics_cache = Cache()
 
 class AlbumCover(Widget):
     """using rich renderable to render ascii album cover"""

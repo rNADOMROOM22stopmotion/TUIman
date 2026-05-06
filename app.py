@@ -1,20 +1,22 @@
 import random
 from pathlib import Path
-from tkinter import Widget
-
 from textual.app import App, ComposeResult
 from textual.color import Color
 from textual.containers import Horizontal, Vertical
 from textual.css.scalar import Scalar, Unit
 from textual.events import Click
 from textual.screen import ModalScreen
-from textual.widgets import Header, Footer, Input, Label, Button, OptionList
+from textual.widgets import Footer, Input, Label, Button, OptionList
+from textual_autocomplete import PathAutoComplete
 from modules.bottom_box import BottomBox, PlayControls, QueueOptions
 from modules.top_box import TopBox, AlbumList
 from utils.models import ReversibleIterator
 from utils.player import init_player, pause, resume
+from utils.caching import Cache
+
 
 init_player()
+path_cacher = Cache()
 
 def logger(text)->None:
     with open("log.txt", "w") as f:
@@ -25,7 +27,9 @@ class DirectoryDialog(ModalScreen[str]):
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog-container"):
             yield Label(" Enter albums folder path:")
-            yield Input(placeholder="/path/to/albums", id="modal_input")
+            input_widget = Input(placeholder="/path/to/albums", id="modal_input")
+            yield input_widget
+            yield PathAutoComplete(target=input_widget, path=".")
             with Horizontal(id="dialog-buttons"):
                 yield Button("Load", variant="primary", id="dia-sub")
                 yield Button("Load previous path", variant="primary", id="dia-prev")
@@ -37,11 +41,15 @@ class DirectoryDialog(ModalScreen[str]):
             path = Path(raw).expanduser().resolve()
 
             if path.is_dir():
+                path_cacher.create_path_cache(path = str(path))
                 self.dismiss(str(path))
             else:
                 self.query_one(Label).update(" ❌ Invalid path, try again:")
+        # load previous path
         elif event.button.id == "dia-prev":
-            pass
+            path = path_cacher.find_path_cache()
+            if path:
+                self.dismiss(str(path))
 
 
 class Tuiman(App):
@@ -133,6 +141,8 @@ class Tuiman(App):
     def on_click(self, event: Click) -> None:
         if not isinstance(event.widget, (Input, OptionList)):
             self.screen.set_focus(None)
+            for option_list in self.query(OptionList):
+                option_list.highlighted = None
 
 if __name__ == "__main__":
     app = Tuiman()
