@@ -1,10 +1,14 @@
 import random
 from pathlib import Path
+from tkinter import Widget
+
 from textual.app import App, ComposeResult
 from textual.color import Color
+from textual.containers import Horizontal, Vertical
 from textual.css.scalar import Scalar, Unit
+from textual.events import Click
 from textual.screen import ModalScreen
-from textual.widgets import Header, Footer, Input, Label, Button
+from textual.widgets import Header, Footer, Input, Label, Button, OptionList
 from modules.bottom_box import BottomBox, PlayControls, QueueOptions
 from modules.top_box import TopBox, AlbumList
 from utils.models import ReversibleIterator
@@ -19,22 +23,28 @@ def logger(text)->None:
 
 class DirectoryDialog(ModalScreen[str]):
     def compose(self) -> ComposeResult:
-        yield Label(" Enter albums folder path:")
-        yield Input(placeholder="/path/to/albums", id="modal_input")
-        yield Button("Load", variant="primary")
+        with Vertical(id="dialog-container"):
+            yield Label(" Enter albums folder path:")
+            yield Input(placeholder="/path/to/albums", id="modal_input")
+            with Horizontal(id="dialog-buttons"):
+                yield Button("Load", variant="primary", id="dia-sub")
+                yield Button("Load previous path", variant="primary", id="dia-prev")
         #TODO: add textual-autocomplete
 
-    def on_button_pressed(self) -> None:
-        raw = self.query_one(Input).value.strip().strip("'\"")
-        path = Path(raw).expanduser().resolve()
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "dia-sub":
+            raw = self.query_one(Input).value.strip().strip("'\"")
+            path = Path(raw).expanduser().resolve()
 
-        if path.is_dir():
-            self.dismiss(str(path))
-        else:
-            self.query_one(Label).update(" ❌ Invalid path, try again:")
+            if path.is_dir():
+                self.dismiss(str(path))
+            else:
+                self.query_one(Label).update(" ❌ Invalid path, try again:")
+        elif event.button.id == "dia-prev":
+            pass
 
 
-class MusicApp(App):
+class Tuiman(App):
     """main App class"""
     def __init__(self):
         super().__init__()
@@ -52,7 +62,7 @@ class MusicApp(App):
 
     def compose(self) -> ComposeResult:
         # yield Header()
-        # yield Footer()
+        yield Footer()
         # topbox
         yield BottomBox()
 
@@ -120,6 +130,10 @@ class MusicApp(App):
                     tb.queue_iterator = ReversibleIterator(lst=tb.song_queue)
                     tb.song_manager(song_name=next(tb.queue_iterator))
 
+    def on_click(self, event: Click) -> None:
+        if not isinstance(event.widget, (Input, OptionList)):
+            self.screen.set_focus(None)
+
 if __name__ == "__main__":
-    app = MusicApp()
+    app = Tuiman()
     app.run()

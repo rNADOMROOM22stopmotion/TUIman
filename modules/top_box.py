@@ -103,7 +103,7 @@ class LyricBox(Widget):
         if path:
             # Check .cache for lyrics, if found, skip extract_lyrics
             cached_lyrics = await lyrics_cache.find_cache(song_path=self.current_song_path)
-            if cached_lyrics:
+            if cached_lyrics is not None:
                 self.parsed_lyrics = cached_lyrics
             else:
                 try:

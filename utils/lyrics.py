@@ -92,7 +92,8 @@ async def extract_lyrics(path: str) -> dict:
         await lyrics_cache.create_cache(song_path=path, lyrics=lyrics)
         return {"lyrics": lyrics}
 
-
+    # nothing found, store empty list
+    await lyrics_cache.create_cache(song_path=path, lyrics=[])
     return {"lyrics": []}
 
 if "__main__" == __name__:
