@@ -1,5 +1,6 @@
 import random
 from pathlib import Path
+from platformdirs import PlatformDirs
 from textual.app import App, ComposeResult
 from textual.color import Color
 from textual.containers import Horizontal, Vertical
@@ -17,6 +18,20 @@ from .utils.caching import Cache
 
 init_player()
 path_cacher = Cache()
+DIRS = PlatformDirs("tuiman_styles", "TUIman")
+
+# default CSS shipped alongside app.py
+BUNDLED_CSS = Path(__file__).parent / "tuiman.tcss"
+
+def setup_config() -> Path:
+    """Copy default CSS to user config dir if it doesn't exist, return its path."""
+    css_config_path = DIRS.user_config_path / "tuiman.tcss"
+
+    if not css_config_path.exists():
+        DIRS.user_config_path.mkdir(parents=True, exist_ok=True)
+        css_config_path.write_text(BUNDLED_CSS.read_text())
+
+    return css_config_path
 
 class DirectoryDialog(ModalScreen[str]):
     def compose(self) -> ComposeResult:
@@ -67,7 +82,7 @@ class Tuiman(App):
         super().__init__()
         self.library_path: str = ""
 
-    CSS_PATH = "music.tcss"
+    CSS_PATH = str(setup_config())
     BINDINGS = [
         ("n", "backward", "Backward"),
         ("space", "pause", "Pause"),
