@@ -24,19 +24,33 @@ class DirectoryDialog(ModalScreen[str]):
             yield Label(" Enter albums folder path:")
             input_widget = Input(placeholder="/path/to/albums", id="modal_input")
             yield input_widget
-            yield PathAutoComplete(target=input_widget, path="../..")
+            yield PathAutoComplete(target=input_widget, path=Path.cwd())
             with Horizontal(id="dialog-buttons"):
                 yield Button("Load", variant="primary", id="dia-sub")
                 yield Button("Load previous path", variant="primary", id="dia-prev")
+
+    @staticmethod
+    def resolve_album_path(raw: str) -> Path | None:
+        candidate = Path(raw).expanduser().resolve(strict=False)
+
+        if candidate.is_dir():
+            return candidate
+
+        if raw.startswith("/"):
+            fallback = (Path.cwd() / raw.lstrip("/")).resolve(strict=False)
+            if fallback.is_dir():
+                return fallback
+
+        return None
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "dia-sub":
             raw = self.query_one(Input).value.strip().strip("'\"")
             if raw:
-                path = Path(raw).expanduser().resolve()
+                path = self.resolve_album_path(raw)
 
-                if path.is_dir():
-                    path_cacher.create_path_cache(path = str(path))
+                if path:
+                    path_cacher.create_path_cache(path=str(path))
                     self.dismiss(str(path))
                 else:
                     self.query_one(Label).update(" ❌ Invalid path, try again:")
