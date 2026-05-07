@@ -5,7 +5,7 @@ build-backend = "uv_build"
 
 [project]
 name = "tuiman"
-version = "1.0.5"
+version = "1.0.6"
 description = "A TUI music player for your favourite local mp3 albums!"
 readme = "README.md"
 license = { text = "MIT" }

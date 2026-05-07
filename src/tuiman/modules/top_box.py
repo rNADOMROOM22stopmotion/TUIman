@@ -6,7 +6,7 @@ from textual.app import ComposeResult, RenderResult
 from textual.containers import VerticalScroll
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown
+from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown, LoadingIndicator
 from ..utils.caching import Cache
 from ..utils.library_manager import search_function, load_library
 from ..utils.lyrics import extract_lyrics
@@ -44,6 +44,7 @@ class AlbumList(Widget):
 
     def compose(self) -> ComposeResult:
         yield Input(placeholder="Search album name", type="text")
+        yield LoadingIndicator()
         yield OptionList(
             *self.albums
         )
@@ -73,6 +74,7 @@ class SongList(Widget):
 
     def compose(self) -> ComposeResult:
         yield Input(placeholder="Search song name", type="text")
+        yield LoadingIndicator()
         yield OptionList(
         )
 
@@ -230,8 +232,12 @@ class TopBox(Widget):
             self.query_one(AlbumCover).path = album_data[0]["album_art"]
         else:
             self.query_one(AlbumCover).path = UNKNOWN_COVER_PATH
-        self.query_one(AlbumList).data = library
-        self.query_one(SongList).song_data = library
+        album_list = self.query_one(AlbumList)
+        song_list = self.query_one(SongList)
+        album_list.query_one(LoadingIndicator).remove()
+        song_list.query_one(LoadingIndicator).remove()
+        album_list.data = library
+        song_list.song_data = library
 
     ## HELPER FUNCTIONS ##
 
