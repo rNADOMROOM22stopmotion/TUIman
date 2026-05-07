@@ -1,5 +1,6 @@
-from httpcore import ReadTimeout
+import asyncio
 from rich_pixels import Pixels
+from textual import work
 from textual.app import ComposeResult, RenderResult
 from textual.containers import VerticalScroll
 from textual.reactive import reactive
@@ -11,7 +12,12 @@ from utils.lyrics import extract_lyrics
 from utils.models import ReversibleIterator
 from utils.player import get_progress, play_song
 
-lyrics_cache = Cache()
+cache = Cache()
+
+
+def logger(text) -> None:
+    with open("log.txt", "w") as f:
+        f.write(f"{text}\n")
 
 class AlbumCover(Widget):
     """using rich renderable to render ascii album cover"""
@@ -34,9 +40,9 @@ class AlbumCover(Widget):
 class AlbumList(Widget):
     """Lists user albums"""
 
+    data: reactive[dict] = reactive({}, init=False)
     def __init__(self, data: dict) -> None:
         super().__init__()
-        self.data = data
         self.albums = [*data.keys()]
 
     def compose(self) -> ComposeResult:
@@ -50,6 +56,14 @@ class AlbumList(Widget):
 
     def on_input_changed(self, event: Input.Changed) -> None:
         search_function(self, event, self.albums)
+
+    def watch_data(self, data: dict) -> None:
+        """"""
+        self.albums = [*data.keys()]
+        option_list = self.query_one(OptionList)
+        option_list.clear_options()
+        for album in self.albums:
+            option_list.add_option(album)
 
 
 class SongList(Widget):
@@ -97,21 +111,29 @@ class LyricBox(Widget):
         super().__init__()
         self.parsed_lyrics = []
 
-    async def watch_current_song_path(self, path: str) -> None:
-        """Re-parse lyrics whenever the song changes"""
-        self.current_index = -1  # reset index for new song
+    def watch_current_song_path(self, path: str) -> None:
+        self.current_index = -1
+        self.parsed_lyrics = []
+        self.query_one(Markdown).update("")
+
         if path:
-            # Check .cache for lyrics, if found, skip extract_lyrics
-            cached_lyrics = await lyrics_cache.find_cache(song_path=self.current_song_path)
+            self.load_lyrics(path)
+
+    @work(exclusive=True, group="lyrics", exit_on_error=False)
+    async def load_lyrics(self, path: str) -> None:
+        try:
+            cached_lyrics = await cache.find_cache(song_path=path)
             if cached_lyrics is not None:
-                self.parsed_lyrics = cached_lyrics
+                lyrics = cached_lyrics
             else:
-                try:
-                    self.parsed_lyrics = (await extract_lyrics(path=path))['lyrics']
-                except ReadTimeout:
-                    self.parsed_lyrics = []
-        else:
-            self.parsed_lyrics = []
+                lyrics = (await extract_lyrics(path=path)).get("lyrics", [])
+
+        except Exception:
+            lyrics = []
+        if path != self.current_song_path:
+            return
+
+        self.parsed_lyrics = lyrics
 
     def compose(self) -> ComposeResult:
         yield Markdown("")
@@ -175,9 +197,10 @@ class TopBox(Widget):
     song_over: reactive = reactive(False, init=False)
     def __init__(self, path: str) -> None:
         super().__init__()
-        self.current_album: str
-        self.queue_iterator: ReversibleIterator
-        self.data_dict = load_library(path)
+        self.path = path
+        self.current_album: str = ""
+        self.queue_iterator: ReversibleIterator = None
+        self.data_dict: dict = {}
         self.song_queue = []
 
     def compose(self) -> ComposeResult:
@@ -190,12 +213,30 @@ class TopBox(Widget):
         yield AlbumCover()
 
     def on_mount(self) -> None:
-        album_data = list(self.data_dict.values())
-        if album_data:
-            self.query_one(AlbumCover).path = album_data[0]['album_art']
+        # worker that loads library
+        self.load_library_data()
         self.set_interval(1/30, self.song_status)
 
-## HELPER FUNCTIONS ##
+    @work(thread=True, exit_on_error=False)
+    def load_library_data(self) -> None:
+        """runs load_library() asynchronously, calls finish_loading() at end."""
+        library = asyncio.run(load_library(self.path, cache=cache))
+        self.app.call_from_thread(
+            self.finish_loading,
+            library
+        )
+
+    def finish_loading(self, library: dict) -> None:
+        self.data_dict = library
+        album_data = list(self.data_dict.values())
+        if album_data:
+            self.query_one(AlbumCover).path = album_data[0]["album_art"]
+        else:
+            self.query_one(AlbumCover).path = "./media/unknown.png"
+        self.query_one(AlbumList).data = library
+        self.query_one(SongList).song_data = library
+
+    ## HELPER FUNCTIONS ##
 
     def update_queue_box(self, song_name:str):
         qb = self.query_one(QueueBox).query_one(RadioSet)
@@ -209,7 +250,8 @@ class TopBox(Widget):
     def song_manager(self, song_name: str) -> None:
         """ plays song, updates queue, loads lyrics"""
         # play song using player
-        play_song(data_dict=self.data_dict, song_name=song_name)
+        if not play_song(data_dict=self.data_dict, song_name=song_name):
+            return
         # load song lyrics
         path = self.data_dict.get(self.current_album, {}).get("songs", {}).get(song_name, "")
         self.query_one(LyricBox).current_song_path = path
@@ -217,18 +259,16 @@ class TopBox(Widget):
         self.update_queue_box(song_name=song_name)
 
     def set_album_queue(self, song_name: str):
-        for album in self.data_dict.values():
-            songs = album.get('songs', {})
-            if song_name in songs:
-                song_list = sorted(songs.keys())
-                idx = song_list.index(song_name)
-                self.song_queue = song_list[idx:] + song_list[:idx]
-                return
+        album = self.data_dict.get(self.current_album)
+        if not album:
+            return
+        songs = album.get("songs", {})
+        if song_name not in songs:
+            return
+        song_list = sorted(songs.keys())
+        idx = song_list.index(song_name)
+        self.song_queue = song_list[idx:] + song_list[:idx]
 
-    @staticmethod
-    def logger(text) -> None:
-        with open("log.txt", "w") as f:
-            f.write(f"{text}\n")
 ## HELPER FUNCTIONS END ##
 
 
@@ -250,7 +290,6 @@ class TopBox(Widget):
             # generating song queue
             self.set_album_queue(song_name=song_name)
             self.queue_iterator = ReversibleIterator(lst=self.song_queue)
-            # self.logger(self.song_queue)
             self.song_manager(song_name=next(self.queue_iterator))
 
     def song_status(self):

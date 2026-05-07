@@ -22,26 +22,25 @@ def play_song(data_dict: dict, song_name: str) -> bool:
     global _current_album, _current_duration, _current_song, _paused
 
     for album_name, data in data_dict.items():
-        if song_name in data['songs']:
-            path = data['songs'][song_name]
+        if song_name not in data["songs"]:
+            continue
+        path = data["songs"][song_name]
+
+        try:
             pygame.mixer.music.stop()
             pygame.mixer.music.load(path)
             pygame.mixer.music.play()
-            _current_album = album_name
-            _current_song = song_name
-            _paused = False
-
-            # old code to cache duration at load time (mutagen was returning 0.0 for really short audios)
             audio = mutagen.File(path)
-            _current_duration = audio.info.length if audio else 0.0
-
-            # sound = pygame.mixer.Sound(path)
-            # _current_duration = sound.get_length()
-
-            return True
+            _current_duration = audio.info.length if audio and audio.info else 0.0
+        except Exception:
+            _current_duration = 0.0
+            return False
+        _current_album = album_name
+        _current_song = song_name
+        _paused = False
+        return True
 
     return False
-
 def pause() -> None:
     if pygame.mixer.music.get_busy() and not _paused:
         pygame.mixer.music.pause()

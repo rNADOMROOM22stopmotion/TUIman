@@ -18,11 +18,6 @@ from utils.caching import Cache
 init_player()
 path_cacher = Cache()
 
-def logger(text)->None:
-    with open("log.txt", "w") as f:
-        f.write(f"{text}\n")
-
-
 class DirectoryDialog(ModalScreen[str]):
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog-container"):
@@ -33,18 +28,18 @@ class DirectoryDialog(ModalScreen[str]):
             with Horizontal(id="dialog-buttons"):
                 yield Button("Load", variant="primary", id="dia-sub")
                 yield Button("Load previous path", variant="primary", id="dia-prev")
-        #TODO: add textual-autocomplete
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "dia-sub":
             raw = self.query_one(Input).value.strip().strip("'\"")
-            path = Path(raw).expanduser().resolve()
+            if raw:
+                path = Path(raw).expanduser().resolve()
 
-            if path.is_dir():
-                path_cacher.create_path_cache(path = str(path))
-                self.dismiss(str(path))
-            else:
-                self.query_one(Label).update(" ❌ Invalid path, try again:")
+                if path.is_dir():
+                    path_cacher.create_path_cache(path = str(path))
+                    self.dismiss(str(path))
+                else:
+                    self.query_one(Label).update(" ❌ Invalid path, try again:")
         # load previous path
         elif event.button.id == "dia-prev":
             path = path_cacher.find_path_cache()

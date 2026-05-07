@@ -1,6 +1,8 @@
-from pathlib import Path
 from pprint import pprint
 from textual.widgets import Input, OptionList
+from mutagen.id3 import ID3, APIC
+from pathlib import Path
+from utils.caching import Cache
 
 SUPPORTED_AUDIO_EXTENSIONS = {".mp3"}
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
@@ -21,46 +23,67 @@ def search_function(object, event: Input.Changed, iterables) -> None:
     for song_or_album in filtered:
         option_list.add_option(song_or_album)
 
+async def _extract_album_art(album_path: Path, songs: dict, cache: Cache) -> str:
+    """Try cache first, then extract from ID3 tags, store result in cache."""
+    cached = await cache.find_album_art_cache(str(album_path))
+    if cached:
+        return cached
+
+    for song_path in songs.values():
+        try:
+            tags = ID3(song_path)
+            for tag in tags.values():
+                if isinstance(tag, APIC):
+                    return await cache.create_album_art_cache(str(album_path), tag.data)
+        except Exception:
+            continue
+
+    return ""
+
+
 def _load_album(album_path: Path) -> dict | None:
     songs = {}
-    album_art = ""
 
-    for entry in sorted(album_path.iterdir(), key=lambda e: e.name.casefold()):
-        if not entry.is_file():
-            continue
-
-        extension = entry.suffix.casefold()
-        if extension in SUPPORTED_IMAGE_EXTENSIONS and not album_art:
-            album_art = str(entry)
-            continue
-
-        if extension not in SUPPORTED_AUDIO_EXTENSIONS:
-            continue
-
-        songs[entry.stem] = str(entry)
+    for extension in SUPPORTED_AUDIO_EXTENSIONS:
+        for entry in album_path.glob(f"*{extension}"):
+            songs[entry.stem] = str(entry)
 
     if not songs:
         return None
 
-    return {
-        "songs": songs,
-        "album_art": album_art,
-    }
+    # Sort by filename for consistent ordering
+    songs = dict(sorted(songs.items(), key=lambda kv: kv[0].casefold()))
+    return {"songs": songs, "album_art": ""}
 
 
-def load_library(root_dir: str) -> dict:
+async def load_library(root_dir: str, cache: Cache) -> dict:
     library = {}
+    seen_names = {}  # name -> count of times seen
     root_path = Path(root_dir).expanduser().resolve()
 
-    album_paths = [entry for entry in root_path.iterdir() if entry.is_dir()]
+    album_paths = set()
+    for extension in SUPPORTED_AUDIO_EXTENSIONS:
+        for match in root_path.rglob(f"*{extension}"):
+            album_paths.add(match.parent)
+
     if not album_paths:
-        album_paths = [root_path]
+        album_paths = {root_path}
 
     for album_path in sorted(album_paths, key=lambda e: e.name.casefold()):
         album = _load_album(album_path)
         if album is None:
             continue
-        library[album_path.name] = album
+
+        album["album_art"] = await _extract_album_art(album_path, album["songs"], cache)
+
+        name = album_path.name
+        if name not in seen_names:
+            seen_names[name] = 0
+            library[name] = album
+        else:
+            seen_names[name] += 1
+            library[f"{name} ({seen_names[name]})"] = album
+
     return library
 
 
