@@ -16,6 +16,10 @@ SongList {
     height: 1fr;
 }
 
+SongList > OptionList {
+    height: 1fr;
+}
+
 LyricBox {
     border: dashed round deeppink;
     width: 100%;

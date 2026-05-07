@@ -65,7 +65,7 @@ def load_library(root_dir: str) -> dict:
 
 
 if "__main__" == __name__:
-    library = load_library(r"F:\koding\PythonProject\data")
+    library = load_library("../data")
     # print(*library.get("album2", []).keys())
     pprint(library)
     # print(list(library.values())[0]['album_art'])

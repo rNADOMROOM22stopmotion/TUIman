@@ -211,8 +211,7 @@ class TopBox(Widget):
         # play song using player
         play_song(data_dict=self.data_dict, song_name=song_name)
         # load song lyrics
-        path = next(
-            (songs[song_name] for album in self.data_dict.values() for songs in [album['songs']] if song_name in songs), "")
+        path = self.data_dict.get(self.current_album, {}).get("songs", {}).get(song_name, "")
         self.query_one(LyricBox).current_song_path = path
         # update queue box
         self.update_queue_box(song_name=song_name)
