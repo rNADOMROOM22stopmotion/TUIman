@@ -3,7 +3,7 @@ from textual.color import Gradient
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Button, Label, ProgressBar
-from utils.player import get_progress, get_current
+from src.tuiman.utils.player import get_progress, get_current
 
 
 class PlayControls(Widget):

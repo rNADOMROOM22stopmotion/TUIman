@@ -24,7 +24,7 @@ class DirectoryDialog(ModalScreen[str]):
             yield Label(" Enter albums folder path:")
             input_widget = Input(placeholder="/path/to/albums", id="modal_input")
             yield input_widget
-            yield PathAutoComplete(target=input_widget, path=".")
+            yield PathAutoComplete(target=input_widget, path="../..")
             with Horizontal(id="dialog-buttons"):
                 yield Button("Load", variant="primary", id="dia-sub")
                 yield Button("Load previous path", variant="primary", id="dia-prev")
@@ -139,6 +139,7 @@ class Tuiman(App):
             for option_list in self.query(OptionList):
                 option_list.highlighted = None
 
-if __name__ == "__main__":
+
+def main():
     app = Tuiman()
     app.run()

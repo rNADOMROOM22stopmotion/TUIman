@@ -6,18 +6,13 @@ from textual.containers import VerticalScroll
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown
-from utils.caching import Cache
-from utils.library_manager import search_function, load_library
-from utils.lyrics import extract_lyrics
-from utils.models import ReversibleIterator
-from utils.player import get_progress, play_song
+from src.tuiman.utils.caching import Cache
+from src.tuiman.utils.library_manager import search_function, load_library
+from src.tuiman.utils.lyrics import extract_lyrics
+from src.tuiman.utils.models import ReversibleIterator
+from src.tuiman.utils.player import get_progress, play_song
 
 cache = Cache()
-
-
-def logger(text) -> None:
-    with open("log.txt", "w") as f:
-        f.write(f"{text}\n")
 
 class AlbumCover(Widget):
     """using rich renderable to render ascii album cover"""

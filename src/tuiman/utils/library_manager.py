@@ -2,7 +2,7 @@ from pprint import pprint
 from textual.widgets import Input, OptionList
 from mutagen.id3 import ID3, APIC
 from pathlib import Path
-from utils.caching import Cache
+from src.tuiman.utils.caching import Cache
 
 SUPPORTED_AUDIO_EXTENSIONS = {".mp3"}
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
@@ -88,7 +88,7 @@ async def load_library(root_dir: str, cache: Cache) -> dict:
 
 
 if "__main__" == __name__:
-    library = load_library("../data")
+    library = load_library("../../../data")
     # print(*library.get("album2", []).keys())
     pprint(library)
     # print(list(library.values())[0]['album_art'])

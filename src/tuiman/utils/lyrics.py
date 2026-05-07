@@ -1,11 +1,10 @@
 import asyncio
 import os
 import re
-from pprint import pprint
 import httpx
 import mutagen.id3
 from httpx import ReadTimeout
-from utils.caching import Cache
+from src.tuiman.utils.caching import Cache
 
 BASE_URL = "https://lrclib.net/api/search"
 lyrics_cache = Cache()
