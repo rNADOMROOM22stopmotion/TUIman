@@ -2,7 +2,7 @@ from pprint import pprint
 from textual.widgets import Input, OptionList
 from mutagen.id3 import ID3, APIC
 from pathlib import Path
-from src.tuiman.utils.caching import Cache
+from .caching import Cache
 
 SUPPORTED_AUDIO_EXTENSIONS = {".mp3"}
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}

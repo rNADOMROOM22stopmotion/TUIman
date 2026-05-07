@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from rich_pixels import Pixels
 from textual import work
 from textual.app import ComposeResult, RenderResult
@@ -6,27 +7,28 @@ from textual.containers import VerticalScroll
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown
-from src.tuiman.utils.caching import Cache
-from src.tuiman.utils.library_manager import search_function, load_library
-from src.tuiman.utils.lyrics import extract_lyrics
-from src.tuiman.utils.models import ReversibleIterator
-from src.tuiman.utils.player import get_progress, play_song
+from ..utils.caching import Cache
+from ..utils.library_manager import search_function, load_library
+from ..utils.lyrics import extract_lyrics
+from ..utils.models import ReversibleIterator
+from ..utils.player import get_progress, play_song
 
 cache = Cache()
+UNKNOWN_COVER_PATH = str(Path(__file__).resolve().parent.parent / "media" / "unknown.png")
 
 class AlbumCover(Widget):
     """using rich renderable to render ascii album cover"""
-    path: reactive[str] = reactive("./media/unknown.png")
+    path: reactive[str] = reactive(UNKNOWN_COVER_PATH)
 
     def __init__(self):
         super().__init__()
         self._album_cover = None
 
     def on_mount(self) -> None:
-        self._album_cover = Pixels.from_image_path("./media/unknown.png", resize=(20, 15))
+        self._album_cover = Pixels.from_image_path(UNKNOWN_COVER_PATH, resize=(20, 15))
 
     def watch_path(self, new_path: str) -> None:
-        self._album_cover = Pixels.from_image_path(new_path or "./media/unknown.png", resize=(20, 15))
+        self._album_cover = Pixels.from_image_path(new_path or UNKNOWN_COVER_PATH, resize=(20, 15))
         self.refresh()
 
     def render(self) -> RenderResult:
@@ -227,7 +229,7 @@ class TopBox(Widget):
         if album_data:
             self.query_one(AlbumCover).path = album_data[0]["album_art"]
         else:
-            self.query_one(AlbumCover).path = "./media/unknown.png"
+            self.query_one(AlbumCover).path = UNKNOWN_COVER_PATH
         self.query_one(AlbumList).data = library
         self.query_one(SongList).song_data = library
 
@@ -303,4 +305,3 @@ class TopBox(Widget):
             return
 
         self.song_manager(song_name=next(self.queue_iterator))
-

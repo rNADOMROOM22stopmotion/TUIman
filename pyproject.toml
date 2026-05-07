@@ -5,7 +5,7 @@ build-backend = "uv_build"
 
 [project]
 name = "tuiman"
-version = "1.0.0"
+version = "1.0.3"
 description = "A TUI music player for your favourite local mp3 albums!"
 readme = "README.md"
 license = { text = "MIT" }
@@ -23,4 +23,4 @@ dependencies = [
 ]
 
 [project.scripts]
-my-cli = "tuiman.app:main"
+tuiman = "tuiman.app:main"

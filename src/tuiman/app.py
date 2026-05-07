@@ -8,11 +8,11 @@ from textual.events import Click
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Input, Label, Button, OptionList
 from textual_autocomplete import PathAutoComplete
-from modules.bottom_box import BottomBox, PlayControls, QueueOptions
-from modules.top_box import TopBox, AlbumList
-from utils.models import ReversibleIterator
-from utils.player import init_player, pause, resume
-from utils.caching import Cache
+from .modules.bottom_box import BottomBox, PlayControls, QueueOptions
+from .modules.top_box import TopBox, AlbumList
+from .utils.models import ReversibleIterator
+from .utils.player import init_player, pause, resume
+from .utils.caching import Cache
 
 
 init_player()
