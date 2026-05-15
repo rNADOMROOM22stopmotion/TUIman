@@ -5,7 +5,7 @@ build-backend = "uv_build"
 
 [project]
 name = "tuiman"
-version = "1.0.5"
+version = "1.0.7"
 description = "A TUI music player for your favourite local mp3 albums!"
 readme = "README.md"
 license = { text = "MIT" }
@@ -20,7 +20,11 @@ dependencies = [
     "textual>=8.2.4",
     "textual-autocomplete>=4.0.6",
     "textual-dev>=1.8.0",
+    "textual-themes",
 ]
 
 [project.scripts]
 tuiman = "tuiman.app:main"
+
+[tool.uv.sources]
+textual-themes = { git = "https://github.com/michaelblaess/textual-themes.git" }

@@ -9,10 +9,11 @@ from textual.events import Click
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Input, Label, Button, OptionList
 from textual_autocomplete import PathAutoComplete
+from textual_themes import register_all
 from .modules.bottom_box import BottomBox, PlayControls, QueueOptions
-from .modules.top_box import TopBox, AlbumList
+from .modules.top_box import TopBox, AlbumList, SongList
 from .utils.models import ReversibleIterator
-from .utils.player import init_player, pause, resume
+from .utils.player import init_player
 from .utils.caching import Cache
 
 
@@ -82,6 +83,9 @@ class Tuiman(App):
         super().__init__()
         self.library_path: str = ""
 
+        register_all(self)
+        self.theme = "fifty-eight"
+
     CSS_PATH = str(setup_config())
     BINDINGS = [
         ("n", "backward", "Backward"),
@@ -94,7 +98,7 @@ class Tuiman(App):
 
     def compose(self) -> ComposeResult:
         # yield Header()
-        yield Footer()
+        yield Footer(show_command_palette=False)
         # topbox
         yield BottomBox()
 
@@ -130,19 +134,6 @@ class Tuiman(App):
             else:
                 album_obj.styles.width = Scalar(value=100.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH)
 
-        # play/pause, forward backward buttons
-        if event.button.id == "pause":
-            if event.button.label == "||":
-                event.button.label = "▶"
-                event.button.styles.border = ("round", "yellow")
-                event.button.styles.color = "deeppink"
-                pause()
-            else:
-                event.button.label = "||"
-                event.button.styles.border = ("round", "deeppink")
-                event.button.styles.color = Color(255, 255, 255, 0.7)
-                resume()
-
         if "playback" in event.button.classes:
             tb = self.query_one(TopBox)
             # forward backward logic
@@ -163,10 +154,20 @@ class Tuiman(App):
                     tb.song_manager(song_name=next(tb.queue_iterator))
 
     def on_click(self, event: Click) -> None:
+        """Focusing logic"""
         if not isinstance(event.widget, (Input, OptionList)):
             self.screen.set_focus(None)
             for option_list in self.query(OptionList):
                 option_list.highlighted = None
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        """This function ensures play button state stays updated when song is selected"""
+        if event.control in self.query_one(SongList).query(OptionList):
+            play_btn = self.query_one("#pause", Button)
+            if play_btn.label == "▶":
+                play_btn.label = "||"
+                play_btn.styles.border = ("round", "deeppink")
+                play_btn.styles.color = Color(255, 255, 255, 0.7)
 
 
 def main():

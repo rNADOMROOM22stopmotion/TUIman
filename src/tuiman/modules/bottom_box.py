@@ -1,9 +1,9 @@
 from textual.app import ComposeResult
-from textual.color import Gradient
+from textual.color import Gradient, Color
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Button, Label, ProgressBar
-from ..utils.player import get_progress, get_current
+from ..utils.player import get_progress, get_current, pause, resume
 
 
 class PlayControls(Widget):
@@ -12,6 +12,27 @@ class PlayControls(Widget):
         yield Button("⏮", id="backward", classes="playback", variant="primary", flat=True)
         yield Button("||", id="pause",variant="success", flat=True)
         yield Button("⏭", id="forward", classes="playback",variant="primary", flat=True)
+
+    def on_button_pressed(self, event: Button.Pressed)-> None:
+        # play/pause, forward backward buttons
+        if event.button.id == "pause":
+            if event.button.label == "||":
+                event.button.label = "▶"
+                event.button.styles.border = ("round", "yellow")
+                event.button.styles.color = "deeppink"
+                pause()
+            else:
+                event.button.label = "||"
+                event.button.styles.border = ("round", "deeppink")
+                event.button.styles.color = Color(255, 255, 255, 0.7)
+                resume()
+
+        elif "playback" in event.button.classes:
+            play_btn = self.query_one("#pause", Button)
+            if play_btn.label == "▶":
+                play_btn.label = "||"
+                play_btn.styles.border = ("round", "deeppink")
+                play_btn.styles.color = Color(255, 255, 255, 0.7)
 
 
 class Playback(Widget):

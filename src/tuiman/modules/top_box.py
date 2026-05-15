@@ -110,14 +110,6 @@ class LyricBox(Widget):
         super().__init__()
         self.parsed_lyrics = []
 
-    def watch_current_song_path(self, path: str) -> None:
-        self.current_index = -1
-        self.parsed_lyrics = []
-        self.query_one(Markdown).update("")
-
-        if path:
-            self.load_lyrics(path)
-
     @work(exclusive=True, group="lyrics", exit_on_error=False)
     async def load_lyrics(self, path: str) -> None:
         try:
@@ -133,6 +125,14 @@ class LyricBox(Widget):
             return
 
         self.parsed_lyrics = lyrics
+
+    def watch_current_song_path(self, path: str) -> None:
+        self.current_index = -1
+        self.parsed_lyrics = []
+        self.query_one(Markdown).update("")
+
+        if path:
+            self.load_lyrics(path)
 
     def compose(self) -> ComposeResult:
         yield Markdown("")
@@ -273,7 +273,6 @@ class TopBox(Widget):
         self.song_queue = song_list[idx:] + song_list[:idx]
 
 ## HELPER FUNCTIONS END ##
-
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         # Make sure the event came from AlbumList, not SongList's OptionList

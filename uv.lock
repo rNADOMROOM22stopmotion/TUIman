@@ -600,6 +600,24 @@ wheels = [
 ]
 
 [[package]]
+name = "textual-themes"
+version = "0.8.0"
+source = { git = "https://github.com/michaelblaess/textual-themes.git#028025628bbbe164439baac8947e445cd545cdb5" }
+dependencies = [
+    { name = "textual" },
+    { name = "textual-widgets" },
+]
+
+[[package]]
+name = "textual-widgets"
+version = "0.8.0"
+source = { git = "https://github.com/michaelblaess/textual-widgets.git#f9b4662cf8b56c698ff6ba2c96dd589f8d38fc3f" }
+dependencies = [
+    { name = "rich" },
+    { name = "textual" },
+]
+
+[[package]]
 name = "tuiman"
 version = "1.0.5"
 source = { editable = "." }
@@ -613,6 +631,7 @@ dependencies = [
     { name = "textual" },
     { name = "textual-autocomplete" },
     { name = "textual-dev" },
+    { name = "textual-themes" },
 ]
 
 [package.metadata]
@@ -626,6 +645,7 @@ requires-dist = [
     { name = "textual", specifier = ">=8.2.4" },
     { name = "textual-autocomplete", specifier = ">=4.0.6" },
     { name = "textual-dev", specifier = ">=1.8.0" },
+    { name = "textual-themes", git = "https://github.com/michaelblaess/textual-themes.git" },
 ]
 
 [[package]]
