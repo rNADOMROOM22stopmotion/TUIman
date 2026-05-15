@@ -98,7 +98,7 @@ class Tuiman(App):
 
     def compose(self) -> ComposeResult:
         # yield Header()
-        yield Footer(show_command_palette=False)
+        yield Footer()
         # topbox
         yield BottomBox()
 
