@@ -4,6 +4,7 @@ from rich_pixels import Pixels
 from textual import work
 from textual.app import ComposeResult, RenderResult
 from textual.containers import VerticalScroll
+from textual.css.query import NoMatches
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown, LoadingIndicator
@@ -101,14 +102,42 @@ class SongList(Widget):
 
 class RightPane(Widget):
     pass
+
+class StaticLyricBox(VerticalScroll):
+    """static lyrics Markdown"""
+    plain_lyrics: reactive[str] = reactive("", init=False)
+    def __init__(self):
+        super().__init__()
+
+    def compose(self) -> ComposeResult:
+        markdown_content = f"```{self.plain_lyrics}```"
+        yield Markdown(markdown_content, id="plain")
+
+    def watch_plain_lyrics(self, lyrics)->None:
+        markdown_content = f"```\n{lyrics}\n```"
+        self.query_one("#plain", Markdown).update(markdown_content)
+
 class LyricBox(Widget):
     """Display song lyrics"""
 
     current_index: reactive[int] = reactive(-1)
     current_song_path: reactive[str] = reactive("")
+    mode: reactive[str] = reactive("synced")
     def __init__(self):
         super().__init__()
-        self.parsed_lyrics = []
+        self.synced_lyrics = []
+        self.plain_lyrics = ""
+
+    def on_mount(self) -> None:
+        self.border_title = "Lyrics"
+        # Poll every 1/30ms
+        self.set_interval(1/30, self.update_lyrics)
+
+    def compose(self) -> ComposeResult:
+        yield Markdown("", id="synced")
+        sb = StaticLyricBox()
+        sb.styles.height = 0
+        yield sb
 
     @work(exclusive=True, group="lyrics", exit_on_error=False)
     async def load_lyrics(self, path: str) -> None:
@@ -117,33 +146,45 @@ class LyricBox(Widget):
             if cached_lyrics is not None:
                 lyrics = cached_lyrics
             else:
-                lyrics = (await extract_lyrics(path=path)).get("lyrics", [])
+                lyrics = (await extract_lyrics(path=path)).get("lyrics", {})
 
         except Exception:
             lyrics = []
         if path != self.current_song_path:
             return
 
-        self.parsed_lyrics = lyrics
+        self.synced_lyrics = lyrics.get("synced_lyrics", [])
+        self.plain_lyrics = lyrics.get("plain_lyrics", "")
+        self.query_one(StaticLyricBox).plain_lyrics = self.plain_lyrics
+
+    def watch_mode(self, mode)->None:
+        try:
+            static_box = self.query_one(StaticLyricBox)
+            synced_md = self.query_one("#synced", Markdown)
+        except NoMatches:
+            return
+
+        if mode == "plain":
+            static_box.styles.height = 10
+            synced_md.styles.height = 0
+            self.styles.height = 10
+            self.border_title = "Plain Lyrics"
+        elif mode == "synced":
+            static_box.styles.height = 0
+            synced_md.styles.height = 5
+            self.styles.height = 5
+            self.border_title = "Lyrics"
 
     def watch_current_song_path(self, path: str) -> None:
         self.current_index = -1
-        self.parsed_lyrics = []
-        self.query_one(Markdown).update("")
+        self.synced_lyrics = []
+        self.query_one("#synced", Markdown).update("")
 
         if path:
             self.load_lyrics(path)
 
-    def compose(self) -> ComposeResult:
-        yield Markdown("")
-
-    def on_mount(self) -> None:
-        self.border_title = "Lyrics"
-        # Poll every 1/30ms
-        self.set_interval(1/30, self.update_lyrics)
-
     def update_lyrics(self) -> None:
-        if not self.parsed_lyrics:
+        if not self.synced_lyrics:
             return
 
         progress = get_progress()
@@ -155,7 +196,7 @@ class LyricBox(Widget):
 
         # Find the latest lyric whose time <= now
         idx = -1
-        for i, (t, _) in enumerate(self.parsed_lyrics):
+        for i, (t, _) in enumerate(self.synced_lyrics):
             if t <= now:
                 idx = i
             else:
@@ -166,18 +207,18 @@ class LyricBox(Widget):
 
     def watch_current_index(self, idx: int) -> None:
         """Called automatically when current_index changes"""
-        if not self.parsed_lyrics or idx == -1:
-            self.query_one(Markdown).update("")
+        if not self.synced_lyrics or idx == -1:
+            self.query_one("#synced", Markdown).update("")
             return
 
-        lyrics = self.parsed_lyrics
+        lyrics = self.synced_lyrics
 
         prev_text = f"*{lyrics[idx - 1][1]}*  " if idx > 0 else ""
         curr_text = f"**{lyrics[idx][1]}**  "
         next_text = f"*{lyrics[idx + 1][1]}*  " if idx < len(lyrics) - 1 else ""
 
         content = "\n".join(filter(bool, [prev_text, curr_text, next_text]))
-        self.query_one(Markdown).update(content)
+        self.query_one("#synced", Markdown).update(content)
 
 class LeftPane(Widget):
     pass

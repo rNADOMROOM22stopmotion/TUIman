@@ -9,12 +9,12 @@ from textual.events import Click
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Input, Label, Button, OptionList
 from textual_autocomplete import PathAutoComplete
-from textual_themes import register_all
 from .modules.bottom_box import BottomBox, PlayControls, QueueOptions
-from .modules.top_box import TopBox, AlbumList, SongList
+from .modules.top_box import TopBox, AlbumList, SongList, LyricBox
 from .utils.models import ReversibleIterator
 from .utils.player import init_player
 from .utils.caching import Cache
+from themes.themes import register_all
 
 
 init_player()
@@ -84,7 +84,8 @@ class Tuiman(App):
         self.library_path: str = ""
 
         register_all(self)
-        self.theme = "fifty-eight"
+        # self.theme = "fifty-eight"
+        self.theme = "flughund"
 
     CSS_PATH = str(setup_config())
     BINDINGS = [
@@ -93,12 +94,13 @@ class Tuiman(App):
         ("m", "forward", "Forward"),
         ("q", "show_queue", "Show Queue"),
         ("alt+q", "shuffle_queue", "Shuffle Queue"),
+        ("s", "static_box", "Static Lyrics"),
     ]
     AUTO_FOCUS: str | None = "#modal_input"
 
     def compose(self) -> ComposeResult:
         # yield Header()
-        yield Footer()
+        yield Footer(show_command_palette=False)
         # topbox
         yield BottomBox()
 
@@ -112,6 +114,8 @@ class Tuiman(App):
         self.query_one(QueueOptions).query_one("#show-queue").press()
     def action_shuffle_queue(self) -> None:
         self.query_one(QueueOptions).query_one("#shuffle-queue").press()
+    def action_static_box(self) -> None:
+        self.query_one(TopBox).query_one(LyricBox).mode = "synced" if self.query_one(TopBox).query_one(LyricBox).mode == "plain" else "plain"
 
     def on_mount(self) -> None:
         self.push_screen(DirectoryDialog(), self.on_directory_chosen)

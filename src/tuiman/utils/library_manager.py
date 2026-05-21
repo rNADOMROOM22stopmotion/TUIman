@@ -88,7 +88,7 @@ async def load_library(root_dir: str, cache: Cache) -> dict:
 
 
 if "__main__" == __name__:
-    library = load_library("../../../data")
+    # library = load_library("../data")
     # print(*library.get("album2", []).keys())
     pprint(library)
     # print(list(library.values())[0]['album_art'])

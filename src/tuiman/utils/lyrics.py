@@ -1,6 +1,8 @@
 import asyncio
 import os
 import re
+from pprint import pprint
+
 import httpx
 import mutagen.id3
 from httpx import ReadTimeout
@@ -9,7 +11,7 @@ from .caching import Cache
 BASE_URL = "https://lrclib.net/api/search"
 lyrics_cache = Cache()
 
-async def lrclib(**kwargs)->str:
+async def lrclib(**kwargs)->tuple[str, str | None]:
     params = {
     "track_name": kwargs.get("title", None),
     "artist_name": kwargs.get("artist", None),
@@ -20,8 +22,12 @@ async def lrclib(**kwargs)->str:
         response = await client.get(BASE_URL, params=params)
         response.raise_for_status()
         data = response.json()
-        first_match = data[0].get("syncedLyrics") if data else None
-        return first_match
+        if data:
+            synced_lyrics = data[0].get("syncedLyrics") if data else None
+            plain_lyrics = data[0].get("plainLyrics") if data else None
+        else:
+            synced_lyrics = plain_lyrics = None
+        return synced_lyrics, plain_lyrics
 
 async def parse_lrc_lyrics(lrc_text: str) -> list[tuple[float, str]]:
     pattern = re.compile(r'\[(\d+):(\d+\.\d+)\]\s*(.*)')
@@ -52,58 +58,80 @@ async def extract_lyrics(path: str) -> dict:
     try:
         tags = mutagen.id3.ID3(path)
     except mutagen.id3.ID3NoHeaderError:
-        return {"lyrics": []}
+        return {"lyrics": {}}
 
-    # synced lyrics — stores (text, timestamp_in_ms) tuples
     song_meta = {}
+    lyrics = {
+        "synced_lyrics": [],
+        "plain_lyrics": "",
+    }
+
     for key in tags.keys():
-        # synced lyrics found
         if key.startswith("SYLT"):
             sylt = tags[key]
-            lyrics = [
+            lyrics["synced_lyrics"].extend(
                 (round(ms / 1000.0, 3), text.strip())
                 for text, ms in sylt.text
                 if text.strip()
-            ]
-            lyrics.sort(key=lambda x: x[0])
-            # caching those lyrics
-            await lyrics_cache.create_cache(song_path=path, lyrics=lyrics)
-            return {"lyrics": lyrics}
-        else:
-            #track name
-            if key.startswith("TIT2"):
-                song_meta["title"] = tags[key].text
-            #artist name
-            if key.startswith("TPE1"):
-                song_meta["artist"] = tags[key].text
-            #album name
-            if key.startswith("TALB"):
-                song_meta["album"] = tags[key].text
+            )
 
-    # Try to fetch lyrics from LRCLIB
-    try:
-        synced_lyrics = await lrclib(**song_meta)
-    except ReadTimeout:
-        synced_lyrics = []
-    if synced_lyrics:
-        lyrics = await parse_lrc_lyrics(lrc_text=synced_lyrics)
-        # caching those lyrics
+        if key.startswith("USLT"):
+            uslt = tags[key]
+            plain_text = uslt.text.strip()
+
+            if plain_text:
+                if lyrics["plain_lyrics"]:
+                    lyrics["plain_lyrics"] += "\n" + plain_text
+                else:
+                    lyrics["plain_lyrics"] = plain_text
+
+        if key.startswith("TIT2"):
+            song_meta["title"] = " ".join(tags[key].text)
+
+        if key.startswith("TPE1"):
+            song_meta["artist"] = " ".join(tags[key].text)
+
+        if key.startswith("TALB"):
+            song_meta["album"] = " ".join(tags[key].text)
+
+    lyrics["synced_lyrics"].sort(key=lambda x: x[0])
+
+    metadata_has_synced = bool(lyrics["synced_lyrics"])
+    metadata_has_plain = bool(lyrics["plain_lyrics"])
+
+    if metadata_has_synced and metadata_has_plain:
         await lyrics_cache.create_cache(song_path=path, lyrics=lyrics)
         return {"lyrics": lyrics}
 
-    # nothing found, store empty list
-    await lyrics_cache.create_cache(song_path=path, lyrics=[])
-    return {"lyrics": []}
+    try:
+        lrclib_synced, lrclib_plain = await lrclib(**song_meta)
+    except ReadTimeout:
+        lrclib_synced = None
+        lrclib_plain = None
+
+    if not metadata_has_synced and lrclib_synced:
+        lyrics["synced_lyrics"] = await parse_lrc_lyrics(lrc_text=lrclib_synced)
+
+    if not metadata_has_plain and lrclib_plain:
+        lyrics["plain_lyrics"] = lrclib_plain.strip()
+
+    if lyrics["synced_lyrics"] or lyrics["plain_lyrics"]:
+        await lyrics_cache.create_cache(song_path=path, lyrics=lyrics)
+        return {"lyrics": lyrics}
+
+    await lyrics_cache.create_cache(song_path=path, lyrics={})
+    return {"lyrics": {}}
 
 if "__main__" == __name__:
-    # pprint(extract_lyrics("../data/album2/Human Nature - lyrics.mp3"))
+    print(asyncio.run(extract_lyrics("/Users/dhruvrathod/PycharmProjects/TUIman/src/tuiman/data/album2/Cc.mp3")))
     # {'lyrics': [(10.72, 'Looking out'),
     #             (13.35, 'Across the nighttime'),
     # pprint(extract_lyrics(""))
-    lyrics = asyncio.run(lrclib(
-            title="",
-            artist="",
-            album=""
-        ))
-    print(lyrics)
+    # lyrics = asyncio.run(lrclib(
+    #         title="Heart-Shaped Box",
+    #         artist="Nirvana",
+    #         album="In Utero"
+    #     ))
+
+
     # print(asyncio.run(extract_lyrics(path= "../data/exeter/IMAGINARY.mp3")))

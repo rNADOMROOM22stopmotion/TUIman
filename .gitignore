@@ -3,7 +3,7 @@
 .uv/
 .env
 .idea
-data
+src/tuiman/data
 src/tuiman/utils/__pycache__
 __pycache__
 log.txt

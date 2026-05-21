@@ -27,7 +27,7 @@ LyricBox {
     background: black 10%;
 }
 
-LyricBox > Markdown {
+StaticLyricBox > Markdown{
     margin: 0;
     padding: 0;
     background: transparent;

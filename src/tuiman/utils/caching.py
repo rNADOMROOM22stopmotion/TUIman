@@ -7,7 +7,7 @@ import json
 import aiofiles
 
 
-DIRS = PlatformDirs("lyric_cache", "TUIman")
+DIRS = PlatformDirs("tuiman", "TUIman")
 
 class Cache:
     def __init__(self):
@@ -32,7 +32,7 @@ class Cache:
         except (JSONDecodeError, OSError):
             return {}
 
-    async def create_cache(self, song_path: str, lyrics: list) -> None:
+    async def create_cache(self, song_path: str, lyrics: dict) -> None:
         data = await self._load()
         data[song_path] = lyrics
 

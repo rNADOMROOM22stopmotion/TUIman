@@ -3,11 +3,19 @@
 https://github.com/user-attachments/assets/4650b8ca-0aa9-4a08-a05f-a0ab646ecdcc
 
 ## Insallation:
-Requires: Python >=3.14
+
+Requires:
+- Python >=3.14
+- pipx or uv (more building coming soon...)
 
 ```
-pip install tuiman
+pipx install tuiman
 ```
+or
+```
+uv tool install tuiman
+```
+(recommend installing using pipx to keep global space clean from dependencies)
 
 ## Features
 - Displays album art, lyrics, queue.
