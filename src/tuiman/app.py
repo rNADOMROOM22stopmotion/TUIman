@@ -14,7 +14,7 @@ from .modules.top_box import TopBox, AlbumList, SongList, LyricBox
 from .utils.models import ReversibleIterator
 from .utils.player import init_player
 from .utils.caching import Cache
-from themes.themes import register_all
+from tuiman.themes import register_all
 
 
 init_player()
