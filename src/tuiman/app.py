@@ -28,9 +28,8 @@ def setup_config() -> Path:
     """Copy default CSS to user config dir if it doesn't exist, return its path."""
     css_config_path = DIRS.user_config_path / "tuiman.tcss"
 
-    if not css_config_path.exists():
-        DIRS.user_config_path.mkdir(parents=True, exist_ok=True)
-        css_config_path.write_text(BUNDLED_CSS.read_text())
+    DIRS.user_config_path.mkdir(parents=True, exist_ok=True)
+    css_config_path.write_text(BUNDLED_CSS.read_text())
 
     return css_config_path
 

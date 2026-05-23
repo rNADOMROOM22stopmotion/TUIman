@@ -2,7 +2,6 @@ import asyncio
 import os
 import re
 from pprint import pprint
-
 import httpx
 import mutagen.id3
 from httpx import ReadTimeout
@@ -123,7 +122,7 @@ async def extract_lyrics(path: str) -> dict:
     return {"lyrics": {}}
 
 if "__main__" == __name__:
-    print(asyncio.run(extract_lyrics("/Users/dhruvrathod/PycharmProjects/TUIman/src/tuiman/data/album2/Cc.mp3")))
+    print(asyncio.run(extract_lyrics(r'''F:\koding\PythonProject\data\album2\Human Nature - lyrics3.mp3''')))
     # {'lyrics': [(10.72, 'Looking out'),
     #             (13.35, 'Across the nighttime'),
     # pprint(extract_lyrics(""))
@@ -132,6 +131,3 @@ if "__main__" == __name__:
     #         artist="Nirvana",
     #         album="In Utero"
     #     ))
-
-
-    # print(asyncio.run(extract_lyrics(path= "../data/exeter/IMAGINARY.mp3")))

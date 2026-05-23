@@ -7,7 +7,7 @@ from textual.containers import VerticalScroll
 from textual.css.query import NoMatches
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown, LoadingIndicator
+from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown, LoadingIndicator, Static
 from ..utils.caching import Cache
 from ..utils.library_manager import search_function, load_library
 from ..utils.lyrics import extract_lyrics
@@ -110,12 +110,10 @@ class StaticLyricBox(VerticalScroll):
         super().__init__()
 
     def compose(self) -> ComposeResult:
-        markdown_content = f"```{self.plain_lyrics}```"
-        yield Markdown(markdown_content, id="plain")
+        yield Static(self.plain_lyrics, id="plain")
 
     def watch_plain_lyrics(self, lyrics)->None:
-        markdown_content = f"```\n{lyrics}\n```"
-        self.query_one("#plain", Markdown).update(markdown_content)
+        self.query_one("#plain", Static).update(lyrics)
 
 class LyricBox(Widget):
     """Display song lyrics"""
