@@ -8,6 +8,7 @@ from textual.css.query import NoMatches
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown, LoadingIndicator, Static
+# from textual_image.widget import Image
 from ..utils.caching import Cache
 from ..utils.library_manager import search_function, load_library
 from ..utils.lyrics import extract_lyrics
@@ -24,6 +25,9 @@ class AlbumCover(Widget):
     def __init__(self):
         super().__init__()
         self._album_cover = None
+
+    # def compose(self) -> ComposeResult:
+    #     yield Image(UNKNOWN_COVER_PATH)
 
     def on_mount(self) -> None:
         self._album_cover = Pixels.from_image_path(UNKNOWN_COVER_PATH, resize=(20, 15))
