@@ -89,6 +89,7 @@ async def load_library(root_dir: str, cache: Cache) -> dict:
 
 
 if "__main__" == __name__:
+    pass
     # b = Cache()
     # library = asyncio.run(load_library(r"F:\koding\PythonProject\data", cache=b))
     # print(*library.get("album2", []).keys())
