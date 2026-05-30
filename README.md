@@ -8,6 +8,14 @@ Requires:
 - Python >=3.14
 - pipx or uv (more building coming soon...)
 
+
+### macOS & Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rNADOMROOM22stopmotion/TUIman/refs/heads/main/install.sh | bash
+```
+
+### Using pipx/ uv:
 ```
 pipx install tuiman
 ```
