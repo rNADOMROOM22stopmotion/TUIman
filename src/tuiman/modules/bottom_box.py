@@ -1,9 +1,10 @@
+from textual import events
 from textual.app import ComposeResult
 from textual.color import Gradient, Color
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Button, Label, ProgressBar
-from ..utils.player import get_progress, get_current, pause, resume
+from ..utils.player import get_progress, get_current, pause, resume, set_volume
 
 
 class PlayControls(Widget):
@@ -81,9 +82,34 @@ class QueueOptions(Widget):
         self.query_one("#show-queue").border_title = "Show"
         self.query_one("#shuffle-queue").border_subtitle = "queue"
 
+class VolumeControl(Widget):
+    """Control volume"""
+
+    volume: reactive[int] = reactive(12, init=False)
+
+    def compose(self) -> ComposeResult:
+        yield Label(self._render_bar(self.volume))
+
+    @staticmethod
+    def _render_bar(level: int) -> str:
+        filled = level
+        empty = 12 - level
+        return f"- {'▓' * filled}{'░' * empty} +"
+
+    def watch_volume(self, level: int) -> None:
+        self.query_one(Label).update(self._render_bar(level))
+        set_volume(level / 12)
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "plus" or event.key == "=":
+            self.volume = min(12, self.volume + 1)
+        elif event.key == "minus":
+            self.volume = max(0, self.volume - 1)
+
 class BottomBox(Widget):
     """Class containing play controls and playback bar"""
     def compose(self) -> ComposeResult:
         yield PlayControls()
         yield Playback()
+        yield VolumeControl()
         yield QueueOptions()

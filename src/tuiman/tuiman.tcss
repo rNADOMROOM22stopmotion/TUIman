@@ -72,7 +72,15 @@ PlayControls {
 }
 
 Playback {
-    width: 100%;
+    width: 24%;
+}
+
+VolumeControl{
+    align-vertical: bottom;
+    border: round white 0%;
+    padding-left: 1;
+    padding-right: 1;
+    width: 20;
 }
 
 QueueOptions {

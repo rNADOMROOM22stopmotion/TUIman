@@ -1,6 +1,7 @@
 import random
 from pathlib import Path
 from platformdirs import PlatformDirs
+from textual import events
 from textual.app import App, ComposeResult
 from textual.color import Color
 from textual.containers import Horizontal, Vertical
@@ -9,7 +10,7 @@ from textual.events import Click
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Input, Label, Button, OptionList
 from textual_autocomplete import PathAutoComplete
-from .modules.bottom_box import BottomBox, PlayControls, QueueOptions
+from .modules.bottom_box import BottomBox, PlayControls, QueueOptions, VolumeControl
 from .modules.top_box import TopBox, AlbumList, SongList, LyricBox
 from .utils.models import ReversibleIterator
 from .utils.player import init_player
@@ -87,6 +88,7 @@ class Tuiman(App):
         self.theme = "flughund"
 
     CSS_PATH = str(setup_config())
+    # CSS_PATH = BUNDLED_CSS
     BINDINGS = [
         ("n", "backward", "Backward"),
         ("space", "pause", "Pause"),
@@ -172,6 +174,8 @@ class Tuiman(App):
                 play_btn.styles.border = ("round", "deeppink")
                 play_btn.styles.color = Color(255, 255, 255, 0.7)
 
+    def on_key(self, event: events.Key) -> None:
+        self.query_one(VolumeControl).on_key(event)
 
 def main():
     app = Tuiman()
