@@ -1,3 +1,4 @@
+import asyncio
 from pprint import pprint
 from textual.widgets import Input, OptionList
 from mutagen.id3 import ID3, APIC
@@ -88,9 +89,10 @@ async def load_library(root_dir: str, cache: Cache) -> dict:
 
 
 if "__main__" == __name__:
-    # library = load_library("../data")
+    # b = Cache()
+    # library = asyncio.run(load_library(r"F:\koding\PythonProject\data", cache=b))
     # print(*library.get("album2", []).keys())
-    pprint(library)
+    # pprint(library)
     # print(list(library.values())[0]['album_art'])
     # print([*library.keys()])
     # for album in library:

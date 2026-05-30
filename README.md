@@ -12,7 +12,7 @@ Requires:
 ### macOS & Linux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rNADOMROOM22stopmotion/TUIman/refs/heads/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/rNADOMROOM22stopmotion/TUIman/main/install.sh | bash
 ```
 
 ### Using pipx/ uv:

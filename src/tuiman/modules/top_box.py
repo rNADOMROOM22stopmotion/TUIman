@@ -240,7 +240,8 @@ class TopBox(Widget):
     def __init__(self, path: str) -> None:
         super().__init__()
         self.path = path
-        self.current_album: str = ""
+        self.current_album: str = "" # the selected album
+        self.playing_album: str = "" # the album which is playing currently
         self.queue_iterator: ReversibleIterator = None
         self.data_dict: dict = {}
         self.song_queue = []
@@ -299,7 +300,7 @@ class TopBox(Widget):
         if not play_song(data_dict=self.data_dict, song_name=song_name):
             return
         # load song lyrics
-        path = self.data_dict.get(self.current_album, {}).get("songs", {}).get(song_name, "")
+        path = self.data_dict.get(self.playing_album, {}).get("songs", {}).get(song_name, "")
         self.query_one(LyricBox).current_song_path = path
         # update queue box
         self.update_queue_box(song_name=song_name)
@@ -314,6 +315,7 @@ class TopBox(Widget):
         song_list = sorted(songs.keys())
         idx = song_list.index(song_name)
         self.song_queue = song_list[idx:] + song_list[:idx]
+        self.playing_album = self.current_album
 
 ## HELPER FUNCTIONS END ##
 
