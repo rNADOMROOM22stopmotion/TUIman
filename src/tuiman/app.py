@@ -2,23 +2,20 @@ import random
 from pathlib import Path
 from platformdirs import PlatformDirs
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.color import Color
-from textual.containers import Horizontal, Vertical
 from textual.css.scalar import Scalar, Unit
 from textual.events import Click
-from textual.screen import ModalScreen
-from textual.widgets import Footer, Input, Label, Button, OptionList
-from textual_autocomplete import PathAutoComplete
-from .modules.bottom_box import BottomBox, PlayControls, QueueOptions
+from textual.widgets import Footer, Input, Button, OptionList
+from .modules.bottom_box import BottomBox
+from .modules.modals import DirectoryDialog, PlaylistScreen
 from .modules.top_box import TopBox, AlbumList, SongList, LyricBox
 from .utils.models import ReversibleIterator
 from .utils.player import init_player
-from .utils.caching import Cache
 from tuiman.themes import register_all
 
 
 init_player()
-path_cacher = Cache()
 DIRS = PlatformDirs("tuiman_styles", "TUIman")
 
 # default CSS shipped alongside app.py
@@ -33,49 +30,6 @@ def setup_config() -> Path:
 
     return css_config_path
 
-class DirectoryDialog(ModalScreen[str]):
-    def compose(self) -> ComposeResult:
-        with Vertical(id="dialog-container"):
-            yield Label(" Enter albums folder path:")
-            input_widget = Input(placeholder="/path/to/albums", id="modal_input")
-            yield input_widget
-            yield PathAutoComplete(target=input_widget, path=Path.cwd())
-            with Horizontal(id="dialog-buttons"):
-                yield Button("Load", variant="primary", id="dia-sub")
-                yield Button("Load previous path", variant="primary", id="dia-prev")
-
-    @staticmethod
-    def resolve_album_path(raw: str) -> Path | None:
-        candidate = Path(raw).expanduser().resolve(strict=False)
-
-        if candidate.is_dir():
-            return candidate
-
-        if raw.startswith("/"):
-            fallback = (Path.cwd() / raw.lstrip("/")).resolve(strict=False)
-            if fallback.is_dir():
-                return fallback
-
-        return None
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "dia-sub":
-            raw = self.query_one(Input).value.strip().strip("'\"")
-            if raw:
-                path = self.resolve_album_path(raw)
-
-                if path:
-                    path_cacher.create_path_cache(path=str(path))
-                    self.dismiss(str(path))
-                else:
-                    self.query_one(Label).update(" ❌ Invalid path, try again:")
-        # load previous path
-        elif event.button.id == "dia-prev":
-            path = path_cacher.find_path_cache()
-            if path:
-                self.dismiss(str(path))
-
-
 class Tuiman(App):
     """main App class"""
     def __init__(self):
@@ -86,7 +40,8 @@ class Tuiman(App):
         # self.theme = "fifty-eight"
         self.theme = "flughund"
 
-    CSS_PATH = str(setup_config())
+    # CSS_PATH = str(setup_config())
+    CSS_PATH = BUNDLED_CSS
     BINDINGS = [
         ("n", "backward", "Backward"),
         ("space", "pause", "Pause"),
@@ -94,6 +49,7 @@ class Tuiman(App):
         ("q", "show_queue", "Show Queue"),
         ("alt+q", "shuffle_queue", "Shuffle Queue"),
         ("s", "static_box", "Static Lyrics"),
+        Binding("right", "playlist_box", "Add to Playlist"),
     ]
     AUTO_FOCUS: str | None = "#modal_input"
 
@@ -104,17 +60,20 @@ class Tuiman(App):
         yield BottomBox()
 
     def action_pause(self) -> None:
-        self.query_one(PlayControls).query("Button")[1].press()
+        self.query_one("#pause", Button).press()
     def action_forward(self) -> None:
-        self.query_one(PlayControls).query("Button")[2].press()
+        self.query_one("#forward", Button).press()
     def action_backward(self) -> None:
-        self.query_one(PlayControls).query("Button")[0].press()
+        self.query_one("#backward", Button).press()
     def action_show_queue(self) -> None:
-        self.query_one(QueueOptions).query_one("#show-queue").press()
+        self.query_one("#show-queue", Button).press()
     def action_shuffle_queue(self) -> None:
-        self.query_one(QueueOptions).query_one("#shuffle-queue").press()
+        self.query_one("#shuffle-queue", Button).press()
     def action_static_box(self) -> None:
         self.query_one(TopBox).query_one(LyricBox).mode = "synced" if self.query_one(TopBox).query_one(LyricBox).mode == "plain" else "plain"
+    def action_playlist_box(self)-> None:
+        # Add logic here the first checks if a song is highlighted, if yes then sends the song info (name and path) to Modal
+        self.push_screen(PlaylistScreen(["apples", "bananas"]))
 
     def on_mount(self) -> None:
         self.push_screen(DirectoryDialog(), self.on_directory_chosen)
@@ -157,7 +116,7 @@ class Tuiman(App):
                     tb.song_manager(song_name=next(tb.queue_iterator))
 
     def on_click(self, event: Click) -> None:
-        """Focusing logic"""
+        """Blur focus and clear option highlights when clicking outside interactive widgets."""
         if not isinstance(event.widget, (Input, OptionList)):
             self.screen.set_focus(None)
             for option_list in self.query(OptionList):

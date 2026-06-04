@@ -1,4 +1,5 @@
 import asyncio
+import re
 from pathlib import Path
 from rich_pixels import Pixels
 from textual import work
@@ -90,6 +91,12 @@ class SongList(Widget):
         all_songs = self.current_songs
         search_function(self, event, all_songs)
 
+    ## helper functions
+    @staticmethod
+    def get_num(s: str) -> int:
+        match = re.match(r"\s*(\d+)", s)
+        return int(match.group(1)) if match else 0
+
     def update_song_list(self, album_name: str) -> None:
         """
         updates the SongList Ui when album is selected
@@ -100,7 +107,7 @@ class SongList(Widget):
         option_list = self.query_one(OptionList)
         option_list.clear_options()
         self.current_songs = []
-        for song in sorted(songs):
+        for song in sorted(songs, key=self.get_num):
             self.current_songs.append(song)
             option_list.add_option(song)
 
