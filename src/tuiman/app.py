@@ -4,12 +4,14 @@ from platformdirs import PlatformDirs
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.color import Color
+from textual.css.query import NoMatches
 from textual.css.scalar import Scalar, Unit
 from textual.events import Click
 from textual.widgets import Footer, Input, Button, OptionList
 from .modules.bottom_box import BottomBox
 from .modules.modals import DirectoryDialog, PlaylistScreen
 from .modules.top_box import TopBox, AlbumList, SongList, LyricBox
+from .utils.caching import Cache
 from .utils.models import ReversibleIterator
 from .utils.player import init_player
 from tuiman.themes import register_all
@@ -35,6 +37,7 @@ class Tuiman(App):
     def __init__(self):
         super().__init__()
         self.library_path: str = ""
+        self.cache = Cache()
 
         register_all(self)
         # self.theme = "fifty-eight"
@@ -70,10 +73,56 @@ class Tuiman(App):
     def action_shuffle_queue(self) -> None:
         self.query_one("#shuffle-queue", Button).press()
     def action_static_box(self) -> None:
-        self.query_one(TopBox).query_one(LyricBox).mode = "synced" if self.query_one(TopBox).query_one(LyricBox).mode == "plain" else "plain"
+        top_box = self._top_box()
+        if top_box is None:
+            return
+
+        lyric_box = top_box.query_one(LyricBox)
+        lyric_box.mode = "synced" if lyric_box.mode == "plain" else "plain"
     def action_playlist_box(self)-> None:
-        # Add logic here the first checks if a song is highlighted, if yes then sends the song info (name and path) to Modal
-        self.push_screen(PlaylistScreen(["apples", "bananas"]))
+        top_box = self._top_box()
+        if top_box is None:
+            return
+
+        song = top_box.get_highlighted_song()
+        if song is None:
+            return
+
+        self.push_screen(
+            PlaylistScreen(
+                self.cache.list_playlists(),
+                song_name=song["name"],
+                song_path=song["path"],
+            ),
+            self.on_playlist_chosen,
+        )
+
+    def _top_box(self) -> TopBox | None:
+        try:
+            return self.query_one(TopBox)
+        except NoMatches:
+            return None
+
+    def on_playlist_chosen(self, result: dict[str, str] | None) -> None:
+        if result is None:
+            return
+
+        added = self.cache.add_song_to_playlist(
+            playlist_name=result["playlist"],
+            song_name=result["song_name"],
+            song_path=result["song_path"],
+        )
+
+        top_box = self._top_box()
+        if top_box is None:
+            return
+
+        top_box.refresh_playlists()
+
+        if added:
+            self.notify(f"Added to {result['playlist']}", timeout=2)
+        else:
+            self.notify(f"Already in {result['playlist']}", severity="warning", timeout=2)
 
     def on_mount(self) -> None:
         self.push_screen(DirectoryDialog(), self.on_directory_chosen)
@@ -89,7 +138,11 @@ class Tuiman(App):
 
         # show Queue if button pressed
         if event.button.id == "show-queue":
-            album_obj = self.query_one(AlbumList)
+            top_box = self._top_box()
+            if top_box is None:
+                return
+
+            album_obj = top_box.query_one(AlbumList)
             # logger(f"{album_obj.styles.width.value}, {album_obj.styles.width.unit}, {album_obj.styles.width.percent_unit}")
             if album_obj.styles.width == Scalar(value=100.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH):
                 album_obj.styles.width = Scalar(value=40.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH)
@@ -97,7 +150,10 @@ class Tuiman(App):
                 album_obj.styles.width = Scalar(value=100.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH)
 
         if "playback" in event.button.classes:
-            tb = self.query_one(TopBox)
+            tb = self._top_box()
+            if tb is None:
+                return
+
             # forward backward logic
             queue = getattr(tb, "queue_iterator", None)
 
@@ -107,7 +163,10 @@ class Tuiman(App):
                 tb.song_manager(song_name=next(queue))
 
         if "queue-btn" in event.button.classes:
-            tb = self.query_one(TopBox)
+            tb = self._top_box()
+            if tb is None:
+                return
+
             # shuffle logic, shuffles the queue, updates queue iterator and plays song using it.
             if tb.song_queue:
                 if event.button.id == "shuffle-queue":
@@ -124,7 +183,12 @@ class Tuiman(App):
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """This function ensures play button state stays updated when song is selected"""
-        if event.control in self.query_one(SongList).query(OptionList):
+        try:
+            song_list = self.query_one(SongList)
+        except NoMatches:
+            return
+
+        if event.control in song_list.query(OptionList):
             play_btn = self.query_one("#pause", Button)
             if play_btn.label == "▶":
                 play_btn.label = "||"

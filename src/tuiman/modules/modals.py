@@ -1,12 +1,13 @@
 from pathlib import Path
 from textual.app import ComposeResult
-from textual.containers import Vertical, Horizontal, Grid
-from textual.screen import ModalScreen, Screen
+from textual.containers import Vertical, Horizontal
+from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, ListView, ListItem
 from textual_autocomplete import PathAutoComplete
 from tuiman.utils.caching import Cache
 
 path_cacher = Cache()
+PlaylistResult = dict[str, str]
 
 class DirectoryDialog(ModalScreen[str]):
     def compose(self) -> ComposeResult:
@@ -50,25 +51,57 @@ class DirectoryDialog(ModalScreen[str]):
             if path:
                 self.dismiss(str(path))
 
-class PlaylistScreen(Screen):
+class PlaylistScreen(ModalScreen[PlaylistResult | None]):
     """Save a song to playlist, create a new playlist..."""
-    def __init__(self, playlists: list[str]) -> None:
+    def __init__(self, playlists: list[str], song_name: str, song_path: str) -> None:
         super().__init__()
         self.playlists = playlists
+        self.song_name = song_name
+        self.song_path = song_path
 
     def compose(self) -> ComposeResult:
         with Vertical(id="playlist-container"):
-            yield Label("Add song to playlist:")
-            yield ListView(*[ListItem(Label(name), name=name) for name in self.playlists],
-                id="playlist-list",)
+            yield Label("Add song to playlist:", id="playlist-label")
+            yield ListView(
+                *[ListItem(Label(name)) for name in self.playlists],
+                id="playlist-list",
+                initial_index=0 if self.playlists else None,
+            )
             with Horizontal(id="playlist-buttons"):
                 yield Button("Add", variant="primary", id="pla-add")
                 yield Button("Cancel", variant="primary", id="pla-can")
             yield Input(placeholder="Playlist name", id="playlist-name")
             yield Button("Create new playlist", variant="primary", id="pla-new")
 
+    def _selected_playlist(self) -> str | None:
+        playlist_list = self.query_one("#playlist-list", ListView)
+        index = playlist_list.index
+        if index is None or index < 0 or index >= len(self.playlists):
+            return None
+        return self.playlists[index]
+
+    def _dismiss_playlist(self, playlist_name: str | None) -> None:
+        if not playlist_name:
+            self.query_one("#playlist-label", Label).update("Select or create a playlist:")
+            return
+
+        self.dismiss(
+            {
+                "playlist": playlist_name,
+                "song_name": self.song_name,
+                "song_path": self.song_path,
+            }
+        )
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "quit":
-            self.app.exit()
-        else:
-            self.app.pop_screen()
+        if event.button.id == "pla-add":
+            self._dismiss_playlist(self._selected_playlist())
+        elif event.button.id == "pla-can":
+            self.dismiss(None)
+        elif event.button.id == "pla-new":
+            playlist_name = self.query_one("#playlist-name", Input).value.strip()
+            self._dismiss_playlist(playlist_name)
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        if event.control.id == "playlist-list":
+            self._dismiss_playlist(self.playlists[event.index])

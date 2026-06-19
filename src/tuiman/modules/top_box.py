@@ -102,12 +102,16 @@ class SongList(Widget):
         updates the SongList Ui when album is selected
         :param album_name: passed by event handler
         """
-        songs = self.song_data.get(album_name, {}).get("songs", [])
+        album = self.song_data.get(album_name, {})
+        songs = album.get("songs", {})
+        song_names = list(songs) if isinstance(songs, dict) else list(songs)
+        if not album.get("is_playlist"):
+            song_names = sorted(song_names, key=self.get_num)
         # clear and repopulate the OptionList
         option_list = self.query_one(OptionList)
         option_list.clear_options()
         self.current_songs = []
-        for song in sorted(songs, key=self.get_num):
+        for song in song_names:
             self.current_songs.append(song)
             option_list.add_option(song)
 
@@ -250,6 +254,7 @@ class TopBox(Widget):
         self.current_album: str = "" # the selected album
         self.playing_album: str = "" # the album which is playing currently
         self.queue_iterator: ReversibleIterator = None
+        self.library_data: dict = {}
         self.data_dict: dict = {}
         self.song_queue = []
 
@@ -277,7 +282,8 @@ class TopBox(Widget):
         )
 
     def finish_loading(self, library: dict) -> None:
-        self.data_dict = library
+        self.library_data = library
+        self.data_dict = self._library_with_playlists(library)
         album_data = list(self.data_dict.values())
         if album_data:
             self.query_one(AlbumCover).path = album_data[0]["album_art"]
@@ -287,10 +293,80 @@ class TopBox(Widget):
         song_list = self.query_one(SongList)
         album_list.query_one(LoadingIndicator).remove()
         song_list.query_one(LoadingIndicator).remove()
-        album_list.data = library
-        song_list.song_data = library
+        album_list.data = self.data_dict
+        song_list.song_data = self.data_dict
 
     ## HELPER FUNCTIONS ##
+
+    @staticmethod
+    def _playlist_display_name(playlist_name: str, existing_names: set[str]) -> str:
+        if playlist_name not in existing_names:
+            return playlist_name
+
+        count = 1
+        while True:
+            candidate = f"{playlist_name} (playlist {count})"
+            if candidate not in existing_names:
+                return candidate
+            count += 1
+
+    def _library_with_playlists(self, library: dict) -> dict:
+        combined = dict(library)
+        existing_names = set(combined)
+
+        for playlist_name, playlist_data in cache.playlists_as_library().items():
+            display_name = self._playlist_display_name(playlist_name, existing_names)
+            combined[display_name] = playlist_data
+            existing_names.add(display_name)
+
+        return combined
+
+    @staticmethod
+    def _song_names_for_album(album: dict) -> list[str]:
+        songs = album.get("songs", {})
+        if not isinstance(songs, dict):
+            return []
+
+        song_names = list(songs)
+        if album.get("is_playlist"):
+            return song_names
+
+        return sorted(song_names, key=SongList.get_num)
+
+    def refresh_playlists(self) -> None:
+        self.data_dict = self._library_with_playlists(self.library_data)
+
+        album_list = self.query_one(AlbumList)
+        song_list = self.query_one(SongList)
+        album_list.data = self.data_dict
+        song_list.song_data = self.data_dict
+
+        if self.current_album in self.data_dict:
+            song_list.update_song_list(self.current_album)
+
+    def get_highlighted_song(self) -> dict[str, str] | None:
+        song_options = self.query_one(SongList).query_one(OptionList)
+        if self.screen.focused is not song_options:
+            return None
+
+        highlighted_option = song_options.highlighted_option
+        if highlighted_option is None:
+            return None
+
+        song_name = str(highlighted_option.prompt)
+        song_path = (
+            self.data_dict
+            .get(self.current_album, {})
+            .get("songs", {})
+            .get(song_name)
+        )
+        if not song_path:
+            return None
+
+        return {
+            "name": song_name,
+            "path": song_path,
+        }
 
     def update_queue_box(self, song_name:str):
         qb = self.query_one(QueueBox).query_one(RadioSet)
@@ -303,11 +379,15 @@ class TopBox(Widget):
 
     def song_manager(self, song_name: str) -> None:
         """ plays song, updates queue, loads lyrics"""
+        album = self.data_dict.get(self.playing_album, {})
+        songs = album.get("songs", {})
+        path = songs.get(song_name, "") if isinstance(songs, dict) else ""
+        if not path:
+            return
         # play song using player
-        if not play_song(data_dict=self.data_dict, song_name=song_name):
+        if not play_song(data_dict={self.playing_album: album}, song_name=song_name):
             return
         # load song lyrics
-        path = self.data_dict.get(self.playing_album, {}).get("songs", {}).get(song_name, "")
         self.query_one(LyricBox).current_song_path = path
         # update queue box
         self.update_queue_box(song_name=song_name)
@@ -319,7 +399,7 @@ class TopBox(Widget):
         songs = album.get("songs", {})
         if song_name not in songs:
             return
-        song_list = sorted(songs.keys())
+        song_list = self._song_names_for_album(album)
         idx = song_list.index(song_name)
         self.song_queue = song_list[idx:] + song_list[:idx]
         self.playing_album = self.current_album
@@ -336,7 +416,7 @@ class TopBox(Widget):
             song_list_obj.update_song_list(album_name)
             song_list_obj.query_one(Input).clear()
             # Update Album Cover Display
-            self.query_one(AlbumCover).path = self.data_dict.get(album_name).get('album_art')
+            self.query_one(AlbumCover).path = self.data_dict.get(album_name, {}).get('album_art')
 
         # If SongList option, selected, play song
         if event.control in self.query_one(SongList).query(OptionList):
