@@ -1,5 +1,6 @@
 import random
 from pathlib import Path
+
 from platformdirs import PlatformDirs
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -7,21 +8,23 @@ from textual.color import Color
 from textual.css.query import NoMatches
 from textual.css.scalar import Scalar, Unit
 from textual.events import Click
-from textual.widgets import Footer, Button, OptionList
+from textual.widgets import Button, Footer, OptionList
+
+from tuiman.themes import register_all
+
 from .modules.bottom_box import BottomBox
 from .modules.modals import DirectoryDialog, PlaylistScreen
-from .modules.top_box import TopBox, AlbumList, SongList, LyricBox
+from .modules.top_box import AlbumList, LyricBox, SongList, TopBox
 from .utils.caching import Cache
 from .utils.models import ReversibleIterator
 from .utils.player import init_player
-from tuiman.themes import register_all
-
 
 init_player()
 DIRS = PlatformDirs("tuiman_styles", "TUIman")
 
 # default CSS shipped alongside app.py
 BUNDLED_CSS = Path(__file__).parent / "tuiman.tcss"
+
 
 def setup_config() -> Path:
     """Copy default CSS to user config dir if it doesn't exist, return its path."""
@@ -32,8 +35,10 @@ def setup_config() -> Path:
 
     return css_config_path
 
+
 class Tuiman(App):
     """main App class"""
+
     def __init__(self):
         super().__init__()
         self.library_path: str = ""
@@ -64,14 +69,19 @@ class Tuiman(App):
 
     def action_pause(self) -> None:
         self.query_one("#pause", Button).press()
+
     def action_forward(self) -> None:
         self.query_one("#forward", Button).press()
+
     def action_backward(self) -> None:
         self.query_one("#backward", Button).press()
+
     def action_show_queue(self) -> None:
         self.query_one("#show-queue", Button).press()
+
     def action_shuffle_queue(self) -> None:
         self.query_one("#shuffle-queue", Button).press()
+
     def action_static_box(self) -> None:
         top_box = self._top_box()
         if top_box is None:
@@ -79,14 +89,17 @@ class Tuiman(App):
 
         lyric_box = top_box.query_one(LyricBox)
         lyric_box.mode = "synced" if lyric_box.mode == "plain" else "plain"
-    def action_playlist_box(self)-> None:
+
+    def action_playlist_box(self) -> None:
         top_box = self._top_box()
         if top_box is None:
             return
 
         song = top_box.get_playlist_song()
         if song is None:
-            self.notify("Select a song or start playback first", severity="warning", timeout=2)
+            self.notify(
+                "Select a song or start playback first", severity="warning", timeout=2
+            )
             return
 
         self.push_screen(
@@ -99,12 +112,14 @@ class Tuiman(App):
         )
 
     def _top_box(self) -> TopBox | None:
+        """Helper function to get the TopBox instance, returns None if not found."""
         try:
             return self.query_one(TopBox)
         except NoMatches:
             return None
 
     def on_playlist_chosen(self, result: dict[str, str] | None) -> None:
+        """Callback for when a playlist is chosen from the PlaylistScreen."""
         if result is None:
             return
 
@@ -123,18 +138,22 @@ class Tuiman(App):
         if added:
             self.notify(f"Added to {result['playlist']}", timeout=2)
         else:
-            self.notify(f"Already in {result['playlist']}", severity="warning", timeout=2)
+            self.notify(
+                f"Already in {result['playlist']}", severity="warning", timeout=2
+            )
 
     def on_mount(self) -> None:
         self.push_screen(DirectoryDialog(), self.on_directory_chosen)
         # pass
 
     def on_directory_chosen(self, path: str) -> None:
+        """Callback for when a directory is chosen from the DirectoryDialog."""
         self.library_path = path
+        # TopBox gets monted first time here.
         self.mount(TopBox(self.library_path), before=self.query_one(BottomBox))
         # set library here
 
-    def on_button_pressed(self, event: Button.Pressed)->None:
+    def on_button_pressed(self, event: Button.Pressed) -> None:
         """handle button presses"""
 
         # show Queue if button pressed
@@ -145,10 +164,16 @@ class Tuiman(App):
 
             album_obj = top_box.query_one(AlbumList)
             # logger(f"{album_obj.styles.width.value}, {album_obj.styles.width.unit}, {album_obj.styles.width.percent_unit}")
-            if album_obj.styles.width == Scalar(value=100.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH):
-                album_obj.styles.width = Scalar(value=40.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH)
+            if album_obj.styles.width == Scalar(
+                value=100.0, unit=Unit.WIDTH, percent_unit=Unit.WIDTH
+            ):
+                album_obj.styles.width = Scalar(
+                    value=40.0, unit=Unit.WIDTH, percent_unit=Unit.WIDTH
+                )
             else:
-                album_obj.styles.width = Scalar(value=100.0, unit=Unit.WIDTH ,percent_unit=Unit.WIDTH)
+                album_obj.styles.width = Scalar(
+                    value=100.0, unit=Unit.WIDTH, percent_unit=Unit.WIDTH
+                )
 
         if "playback" in event.button.classes:
             tb = self._top_box()
