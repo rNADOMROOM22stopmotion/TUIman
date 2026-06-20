@@ -4,8 +4,10 @@ from pathlib import Path
 from rich_pixels import Pixels
 from textual import work
 from textual.app import ComposeResult, RenderResult
+from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.css.query import NoMatches
+from textual.events import Click
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Input, OptionList, RadioSet, RadioButton, Markdown, LoadingIndicator, Static
@@ -14,7 +16,7 @@ from ..utils.caching import Cache
 from ..utils.library_manager import search_function, load_library
 from ..utils.lyrics import extract_lyrics
 from ..utils.models import ReversibleIterator
-from ..utils.player import get_progress, play_song
+from ..utils.player import get_current, get_progress, play_song
 
 cache = Cache()
 UNKNOWN_COVER_PATH = str(Path(__file__).resolve().parent.parent / "media" / "unknown.png")
@@ -40,7 +42,60 @@ class AlbumCover(Widget):
     def render(self) -> RenderResult:
         return self._album_cover
 
-class AlbumList(Widget):
+class OptionListPanel(Widget):
+    """Focusable wrapper for a search input and its option list."""
+
+    can_focus = True
+    BINDINGS = [
+        Binding("up", "cursor_up", "Up", show=False),
+        Binding("down", "cursor_down", "Down", show=False),
+        Binding("enter", "select", "Select", show=False),
+    ]
+
+    @property
+    def options(self) -> OptionList:
+        return self.query_one(OptionList)
+
+    @property
+    def highlighted_option(self):
+        return self.options.highlighted_option
+
+    def focus_options(self) -> None:
+        """Focus the panel and ensure an option is ready for keyboard navigation."""
+        self.focus()
+        if self.options.option_count and self.options.highlighted is None:
+            self.options.highlighted = 0
+
+    def clear_highlight(self) -> None:
+        self.options.highlighted = None
+
+    def _move_highlight(self, direction: str) -> None:
+        self.focus_options()
+        if not self.options.option_count:
+            return
+
+        if self.options.highlighted is None:
+            self.options.highlighted = 0 if direction == "down" else self.options.option_count - 1
+            return
+
+        if direction == "down":
+            self.options.action_cursor_down()
+        else:
+            self.options.action_cursor_up()
+
+    def action_cursor_down(self) -> None:
+        self._move_highlight("down")
+
+    def action_cursor_up(self) -> None:
+        self._move_highlight("up")
+
+    def action_select(self) -> None:
+        self.focus_options()
+        if self.options.highlighted is not None:
+            self.options.action_select()
+
+
+class AlbumList(OptionListPanel):
     """Lists user albums"""
 
     data: reactive[dict] = reactive({}, init=False)
@@ -70,7 +125,7 @@ class AlbumList(Widget):
             option_list.add_option(album)
 
 
-class SongList(Widget):
+class SongList(OptionListPanel):
     """Lists album songs"""
 
     def __init__(self, song_data: dict) -> None:
@@ -344,19 +399,33 @@ class TopBox(Widget):
         if self.current_album in self.data_dict:
             song_list.update_song_list(self.current_album)
 
-    def get_highlighted_song(self) -> dict[str, str] | None:
-        song_options = self.query_one(SongList).query_one(OptionList)
-        if self.screen.focused is not song_options:
+    @staticmethod
+    def _target_inside(target: Widget | None, widget: Widget) -> bool:
+        return target is not None and widget in target.ancestors_with_self
+
+    def _focused_panel(self) -> OptionListPanel | None:
+        focused = self.screen.focused
+        if focused is None:
             return None
 
-        highlighted_option = song_options.highlighted_option
-        if highlighted_option is None:
+        for panel in (self.query_one(AlbumList), self.query_one(SongList)):
+            if self._target_inside(focused, panel):
+                return panel
+        return None
+
+    def _panel_for_click(self, target: Widget | None) -> OptionListPanel | None:
+        if target is None:
             return None
 
-        song_name = str(highlighted_option.prompt)
+        for panel in (self.query_one(AlbumList), self.query_one(SongList)):
+            if self._target_inside(target, panel):
+                return panel
+        return None
+
+    def _song_payload(self, album_name: str, song_name: str) -> dict[str, str] | None:
         song_path = (
             self.data_dict
-            .get(self.current_album, {})
+            .get(album_name, {})
             .get("songs", {})
             .get(song_name)
         )
@@ -367,6 +436,59 @@ class TopBox(Widget):
             "name": song_name,
             "path": song_path,
         }
+
+    def _current_playing_song(self) -> dict[str, str] | None:
+        song_name = get_current().get("song")
+        if not isinstance(song_name, str) or song_name in ("", "-----"):
+            return None
+
+        song = self._song_payload(self.playing_album, song_name)
+        if song is not None:
+            return song
+
+        for album_name in self.data_dict:
+            song = self._song_payload(album_name, song_name)
+            if song is not None:
+                return song
+
+        return None
+
+    def clear_list_focus(self) -> None:
+        panels = (self.query_one(AlbumList), self.query_one(SongList))
+        for panel in panels:
+            panel.clear_highlight()
+
+        focused = self.screen.focused
+        if focused is not None and any(self._target_inside(focused, panel) for panel in panels):
+            self.screen.set_focus(None)
+
+    def get_highlighted_song(self) -> dict[str, str] | None:
+        song_list = self.query_one(SongList)
+        if self._focused_panel() is not song_list:
+            return None
+
+        highlighted_option = song_list.highlighted_option
+        if highlighted_option is None:
+            return None
+
+        song_name = str(highlighted_option.prompt)
+        return self._song_payload(self.current_album, song_name)
+
+    def get_playlist_song(self) -> dict[str, str] | None:
+        return self.get_highlighted_song() or self._current_playing_song()
+
+    def on_click(self, event: Click) -> None:
+        panel = self._panel_for_click(event.widget)
+        if panel is None:
+            self.clear_list_focus()
+            return
+
+        for other_panel in (self.query_one(AlbumList), self.query_one(SongList)):
+            if other_panel is not panel:
+                other_panel.clear_highlight()
+
+        if not isinstance(event.widget, Input):
+            panel.focus_options()
 
     def update_queue_box(self, song_name:str):
         qb = self.query_one(QueueBox).query_one(RadioSet)

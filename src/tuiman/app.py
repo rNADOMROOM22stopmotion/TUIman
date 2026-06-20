@@ -7,7 +7,7 @@ from textual.color import Color
 from textual.css.query import NoMatches
 from textual.css.scalar import Scalar, Unit
 from textual.events import Click
-from textual.widgets import Footer, Input, Button, OptionList
+from textual.widgets import Footer, Button, OptionList
 from .modules.bottom_box import BottomBox
 from .modules.modals import DirectoryDialog, PlaylistScreen
 from .modules.top_box import TopBox, AlbumList, SongList, LyricBox
@@ -84,8 +84,9 @@ class Tuiman(App):
         if top_box is None:
             return
 
-        song = top_box.get_highlighted_song()
+        song = top_box.get_playlist_song()
         if song is None:
+            self.notify("Select a song or start playback first", severity="warning", timeout=2)
             return
 
         self.push_screen(
@@ -175,11 +176,15 @@ class Tuiman(App):
                     tb.song_manager(song_name=next(tb.queue_iterator))
 
     def on_click(self, event: Click) -> None:
-        """Blur focus and clear option highlights when clicking outside interactive widgets."""
-        if not isinstance(event.widget, (Input, OptionList)):
-            self.screen.set_focus(None)
-            for option_list in self.query(OptionList):
-                option_list.highlighted = None
+        """Clear album/song list focus when clicking outside their panels."""
+        top_box = self._top_box()
+        if top_box is None:
+            return
+
+        if top_box._panel_for_click(event.widget) is not None:
+            return
+
+        top_box.clear_list_focus()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """This function ensures play button state stays updated when song is selected"""
